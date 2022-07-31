@@ -33,13 +33,27 @@ void GameEngine::initWindow()
 void GameEngine::initRHI()
 {
     createInstance();
-    pickPhysicalDevice();
-    createLogicalDevice();
-
     assert(instance != VK_NULL_HANDLE);
+
+    createWindowSurface();
+    assert(surface != VK_NULL_HANDLE);
+
+    pickPhysicalDevice();
     assert(physicalDevice != VK_NULL_HANDLE);
+
+    createLogicalDevice();
     assert(logicalDevice != VK_NULL_HANDLE);
     assert(graphicsQueue != VK_NULL_HANDLE);
+}
+
+void GameEngine::createWindowSurface()
+{
+    const VkResult CreateResult =
+        glfwCreateWindowSurface(instance, window, nullptr, &surface);
+
+    if (CreateResult != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create window surface!");
+    }
 }
 
 void GameEngine::init()
@@ -57,6 +71,7 @@ void GameEngine::render()
 
 void GameEngine::cleanup()
 {
+    vkDestroySurfaceKHR(instance, surface, nullptr);
     vkDestroyInstance(instance, nullptr);
     vkDestroyDevice(logicalDevice, nullptr);
 

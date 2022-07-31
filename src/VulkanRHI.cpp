@@ -8,7 +8,8 @@
 #include <vector>
 
 const std::vector<const char*> validationLayers = {
-    "VK_LAYER_KHRONOS_validation"};
+    // "VK_LAYER_KHRONOS_validation"
+    "VK_KHR_surface"};
 
 void GameEngine::createInstance()
 {
@@ -20,10 +21,10 @@ void GameEngine::createInstance()
     VkApplicationInfo appInfo = {};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "Vulkan Game Engine";
-    appInfo.applicationVersion = VK_MAKE_VERSION(0, 0, 1);
+    appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName = "Game Engine";
-    appInfo.engineVersion = VK_MAKE_VERSION(0, 0, 1);
-    appInfo.apiVersion = VK_API_VERSION_1_1;
+    appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+    appInfo.apiVersion = VK_API_VERSION_1_0;
 
     uint32_t extensionCount = 0;
     vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
@@ -91,7 +92,7 @@ void GameEngine::pickPhysicalDevice()
 
         QueueFamilyIndices indices = findQueueFamilies(device);
 
-        return indices.graphicsFamily.has_value();
+        return indices.isValid();
     };
 
     for (const VkPhysicalDevice& device : devices) {
@@ -163,6 +164,13 @@ QueueFamilyIndices GameEngine::findQueueFamilies(const VkPhysicalDevice device)
     for (const VkQueueFamilyProperties& properties : queueFamilies) {
         if (properties.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
             indices.graphicsFamily = i;
+        }
+
+        VkBool32 presentSupport = VK_FALSE;
+        vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface,
+                                             &presentSupport);
+        if (presentSupport) {
+            indices.presentFamily = i;
         }
 
         i += 1;

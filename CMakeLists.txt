@@ -13,6 +13,6 @@ file(GLOB HEADERS
     "src/*.h" "include/*.h")
 
 add_executable(vulkan_renderer ${SOURCES})
-target_link_libraries(vulkan_renderer PRIVATE MoltenVK glfw)
+target_link_libraries(vulkan_renderer PRIVATE MoltenVK glfw vulkan)
 
 target_include_directories(vulkan_renderer PRIVATE ${PROJECT_SOURCE_DIR}/include)
