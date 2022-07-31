@@ -1,26 +1,40 @@
+#define VK_USE_PLATFORM_MACOS_KHR
 #define GLFW_INCLUDE_VULKAN
 #include "GLFW/glfw3.h"
+#define GLFW_EXPOSE_NATIVE_MACOS
+#include "GLFW/glfw3native.h"
 
-class GameEngine {
-public:
-  GameEngine();
-  ~GameEngine();
+#include "Vulkan/QueueFamilyIndices.h"
 
-public:
-  void run();
+class GameEngine
+{
+  public:
+    GameEngine();
+    ~GameEngine();
 
-private:
-  void init();
-  void initWindow();
-  void initRHI();
+  public:
+    void run();
 
-  void render();
-  void cleanup();
+  private:
+    void init();
+    void initWindow();
+    void initRHI();
 
-private:
-  bool checkValidationLayerSupport();
+    void render();
+    void cleanup();
 
-private:
-  GLFWwindow *window;
-  VkInstance instance;
+  private:
+    // Vulkan related initialization
+    void createInstance();
+    void pickPhysicalDevice();
+    void createLogicalDevice();
+    QueueFamilyIndices findQueueFamilies(const VkPhysicalDevice device);
+    bool checkValidationLayerSupport();
+
+  private:
+    GLFWwindow* window;
+    VkInstance instance;
+    VkPhysicalDevice physicalDevice;
+    VkDevice logicalDevice;
+    VkQueue graphicsQueue;
 };
