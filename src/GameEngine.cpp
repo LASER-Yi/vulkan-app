@@ -4,8 +4,12 @@
 #include <stdexcept>
 #include <vector>
 
+#include "Definition.h"
+
 constexpr uint32_t WIDTH = 800;
 constexpr uint32_t HEIGHT = 600;
+const std::vector<const char *> validationLayers = {
+    "VK_LAYER_KHRONOS_validation"};
 
 GameEngine::GameEngine() {}
 
@@ -26,13 +30,17 @@ void GameEngine::initWindow() {
 }
 
 void GameEngine::initRHI() {
+  if (GE_VALIDATION_LAYERS && !checkValidationLayerSupport()) {
+    throw std::runtime_error("Validation layers requested, but not available!");
+  }
+
   VkApplicationInfo appInfo = {};
   appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
   appInfo.pApplicationName = "Vulkan Game Engine";
   appInfo.applicationVersion = VK_MAKE_VERSION(0, 0, 1);
   appInfo.pEngineName = "Game Engine";
   appInfo.engineVersion = VK_MAKE_VERSION(0, 0, 1);
-  appInfo.apiVersion = VK_API_VERSION_1_3;
+  appInfo.apiVersion = VK_API_VERSION_1_1;
 
   uint32_t extensionCount = 0;
   vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
@@ -48,6 +56,14 @@ void GameEngine::initRHI() {
   VkInstanceCreateInfo createInfo = {};
   createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
   createInfo.pApplicationInfo = &appInfo;
+
+#if GE_VALIDATION_LAYERS
+  createInfo.enabledExtensionCount = validationLayers.size();
+  createInfo.ppEnabledExtensionNames = validationLayers.data();
+#else
+  createInfo.enabledExtensionCount = 0;
+  createInfo.ppEnabledExtensionNames = nullptr;
+#endif
 
   uint32_t glfwExtensionCount = 0;
   const char **glfwExtensions =
@@ -82,4 +98,29 @@ void GameEngine::cleanup() {
   glfwTerminate();
 
   window = nullptr;
+}
+
+bool GameEngine::checkValidationLayerSupport() {
+#if PLATFORM_MACOS
+  return true;
+#else
+  uint32_t layerCount = 0;
+  vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+  std::vector<VkLayerProperties> availableLayers(layerCount);
+  vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+  for (const char *layerName : validationLayers) {
+    bool layerFound = false;
+    for (const VkLayerProperties &layerProperties : availableLayers) {
+      if (strcmp(layerName, layerProperties.layerName) == 0) {
+        layerFound = true;
+        break;
+      }
+    }
+    if (!layerFound) {
+      return false;
+    }
+  }
+  return false;
+#endif
 }

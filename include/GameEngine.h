@@ -18,6 +18,9 @@ private:
   void cleanup();
 
 private:
+  bool checkValidationLayerSupport();
+
+private:
   GLFWwindow *window;
   VkInstance instance;
 };
