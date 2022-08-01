@@ -1,7 +1,11 @@
-#ifndef DEBUG
-#define DEBUG 1
+#ifndef BUILD_DEBUG
+#define BUILD_DEBUG 0
 #endif
 
-#define GE_VALIDATION_LAYERS DEBUG
+#ifndef BUILD_RELEASE
+#define BUILD_RELEASE 0
+#endif
+
+#define GE_VALIDATION_LAYERS BUILD_DEBUG
 
 #define PLATFORM_MACOS 1

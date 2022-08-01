@@ -213,11 +213,13 @@ bool GameEngine::checkValidationLayerSupport()
     std::vector<VkLayerProperties> availableLayers(layerCount);
     vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
 
+#if BUILD_DEBUG
     std::cout << "Available layers:" << std::endl;
     for (const VkLayerProperties& layerProperties : availableLayers) {
 
         std::cout << '\t' << layerProperties.layerName << std::endl;
     }
+#endif
 
     for (const char* layerName : validationLayers) {
         bool layerFound = false;
