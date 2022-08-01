@@ -8,8 +8,7 @@
 #include <vector>
 
 const std::vector<const char*> validationLayers = {
-    // "VK_LAYER_KHRONOS_validation"
-    "VK_KHR_surface"};
+    "VK_LAYER_KHRONOS_validation"};
 
 void GameEngine::createInstance()
 {
@@ -24,7 +23,7 @@ void GameEngine::createInstance()
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName = "Game Engine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_0;
+    appInfo.apiVersion = VK_API_VERSION_1_2;
 
     uint32_t extensionCount = 0;
     vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
@@ -41,20 +40,37 @@ void GameEngine::createInstance()
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
 
-#if GE_VALIDATION_LAYERS
-    createInfo.enabledExtensionCount = validationLayers.size();
-    createInfo.ppEnabledExtensionNames = validationLayers.data();
-#else
-    createInfo.enabledExtensionCount = 0;
-    createInfo.ppEnabledExtensionNames = nullptr;
-#endif
+    std::vector<const char*> extensionNames = {};
+    {
+        uint32_t glfwExtensionCount = 0;
+        const char** glfwExtensions =
+            glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
-    uint32_t glfwExtensionCount = 0;
-    const char** glfwExtensions =
-        glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-    createInfo.enabledExtensionCount = glfwExtensionCount;
-    createInfo.ppEnabledExtensionNames = glfwExtensions;
-    createInfo.enabledLayerCount = 0;
+        for (size_t i = 0; i < glfwExtensionCount; i++) {
+            extensionNames.push_back(glfwExtensions[i]);
+        }
+    }
+
+    std::vector<const char*> layerNames = {};
+
+    if (GE_VALIDATION_LAYERS) {
+        layerNames.insert(layerNames.end(), validationLayers.begin(),
+                          validationLayers.end());
+    }
+
+    // Workaround for VK_ERROR_INCOMPATIBLE_DRIVER
+    {
+        createInfo.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+        extensionNames.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+        extensionNames.push_back(
+            VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    }
+
+    createInfo.enabledExtensionCount = extensionNames.size();
+    createInfo.ppEnabledExtensionNames = extensionNames.data();
+
+    createInfo.enabledLayerCount = layerNames.size();
+    createInfo.ppEnabledLayerNames = layerNames.data();
 
     const VkResult CreateResult =
         vkCreateInstance(&createInfo, nullptr, &instance);
@@ -181,14 +197,18 @@ QueueFamilyIndices GameEngine::findQueueFamilies(const VkPhysicalDevice device)
 
 bool GameEngine::checkValidationLayerSupport()
 {
-#if PLATFORM_MACOS
-    return true;
-#else
     uint32_t layerCount = 0;
     vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
 
     std::vector<VkLayerProperties> availableLayers(layerCount);
     vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+
+    std::cout << "Available layers:" << std::endl;
+    for (const VkLayerProperties& layerProperties : availableLayers) {
+
+        std::cout << '\t' << layerProperties.layerName << std::endl;
+    }
+
     for (const char* layerName : validationLayers) {
         bool layerFound = false;
         for (const VkLayerProperties& layerProperties : availableLayers) {
@@ -201,6 +221,5 @@ bool GameEngine::checkValidationLayerSupport()
             return false;
         }
     }
-    return false;
-#endif
+    return true;
 }

@@ -92,39 +92,6 @@ if(WIN32)
   elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
     message(FATAL_ERROR "Vulkan is not supported on 32-bit platform")
   endif()
-elseif(APPLE)
-  find_path(Vulkan_INCLUDE_DIR
-    NAMES vulkan/vulkan.h
-    HINTS 
-      "$ENV{VULKAN_SDK}/include"
-      "$ENV{VULKAN_SDK}/macOS/include"
-      "/usr/local/include"
-      "/opt/homebrew/include"
-  )
-  find_library(Vulkan_LIBRARY
-    NAMES vulkan
-    HINTS 
-      "$ENV{VULKAN_SDK}/lib"
-      "$ENV{VULKAN_SDK}/macOS/lib"
-      "/usr/local/lib"
-      "/opt/homebrew/lib"
-    )
-  find_program(Vulkan_GLSLC_EXECUTABLE
-    NAMES glslc
-    HINTS 
-      "$ENV{VULKAN_SDK}/bin"
-      "$ENV{VULKAN_SDK}/macOS/bin"
-      "/usr/local/bin"
-      "/opt/homebrew/bin"
-    )
-  find_program(Vulkan_GLSLANG_VALIDATOR_EXECUTABLE
-    NAMES glslangValidator
-    HINTS 
-      "$ENV{VULKAN_SDK}/bin"
-      "$ENV{VULKAN_SDK}/macOS/bin"
-      "/usr/local/bin"
-      "/opt/homebrew/bin" 
-    )
 else()
   find_path(Vulkan_INCLUDE_DIR
     NAMES vulkan/vulkan.h
