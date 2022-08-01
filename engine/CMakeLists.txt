@@ -1,4 +1,4 @@
-project(engine)
+project(Engine)
 
 if (CMAKE_SIZEOF_VOID_P EQUAL 4)
     message(FATAL_ERROR "The engine is not compiled for 32-bit systems.")

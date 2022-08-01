@@ -38,4 +38,5 @@ class GameEngine
     VkQueue graphicsQueue;
 
     VkSurfaceKHR surface;
+    VkQueue presentQueue;
 };
