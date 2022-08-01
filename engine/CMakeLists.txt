@@ -8,6 +8,7 @@ find_package(GLFW 3.0.0)
 find_package(Vulkan REQUIRED COMPONENTS Vulkan)
 
 include(CompileTarget)
+include(PlatformMarcos)
 
 add_library(${PROJECT_NAME} ${TARGET_SOURCES} ${TARGET_HEADERS})
 
