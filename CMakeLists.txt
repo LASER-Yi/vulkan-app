@@ -1,11 +1,19 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(vulkan_renderer)
+project(vulkan_app)
 
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS ON)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin")
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake/modules")
+list(APPEND CMAKE_MODULE_PATH 
+    "${CMAKE_CURRENT_SOURCE_DIR}/CMake"
+    "${CMAKE_CURRENT_SOURCE_DIR}/CMake/modules"
+    )
 
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
+# Projects
 add_subdirectory(engine)
 add_subdirectory(app)

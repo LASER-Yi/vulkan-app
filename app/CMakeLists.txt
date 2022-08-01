@@ -1,5 +1,7 @@
 project(app)
 
-add_executable(${PROJECT_NAME} main.cpp)
+include(CompileTarget)
+
+add_executable(${PROJECT_NAME} ${TARGET_SOURCES} ${TARGET_HEADERS})
 
 target_link_libraries(${PROJECT_NAME} engine)
