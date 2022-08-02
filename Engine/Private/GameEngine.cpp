@@ -72,8 +72,8 @@ void GameEngine::render()
 void GameEngine::cleanup()
 {
     vkDestroySurfaceKHR(instance, surface, nullptr);
-    vkDestroyInstance(instance, nullptr);
     vkDestroyDevice(logicalDevice, nullptr);
+    vkDestroyInstance(instance, nullptr);
 
     glfwDestroyWindow(window);
     glfwTerminate();
