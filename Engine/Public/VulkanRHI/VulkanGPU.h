@@ -1,9 +1,11 @@
+#include <memory>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
 #include "VulkanRHI/QueueFamilyIndices.h"
 
 class FVulkanInstance;
+class FVulkanSwapChain;
 
 struct FVulkanGPUCreateParam {
     VkPhysicalDevice device;
@@ -37,10 +39,7 @@ class FVulkanGPU
     VkQueue presentQueue;
     VkDevice logicalDevice;
 
-    VkSwapchainKHR swapChain;
-    std::vector<VkImage> swapChainImages;
-    VkFormat swapChainImageFormat;
-    VkExtent2D swapChainExtent;
+    std::shared_ptr<FVulkanSwapChain> swapChain;
 
   private:
     void Init(const FVulkanGPUCreateParam& Param);

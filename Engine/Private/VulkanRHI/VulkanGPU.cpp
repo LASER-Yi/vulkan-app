@@ -14,6 +14,7 @@
 
 #include "VulkanRHI/SwapChainSupportDetails.h"
 #include "VulkanRHI/VulkanInstance.h"
+#include "VulkanRHI/VulkanSwapChain.h"
 
 const std::vector<const char*> requiredExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME};
@@ -126,6 +127,9 @@ FVulkanGPU::FVulkanGPU(const FVulkanGPUCreateParam& Param) { Init(Param); }
 
 FVulkanGPU::~FVulkanGPU()
 {
+    swapChain->Deinit(logicalDevice);
+    swapChain.reset();
+
     vkDestroyDevice(logicalDevice, nullptr);
     device = VK_NULL_HANDLE;
 }
@@ -239,22 +243,17 @@ void FVulkanGPU::CreateSwapChain(const FVulkanGPUCreateParam& Param)
 
     createInfo.oldSwapchain = VK_NULL_HANDLE;
 
+    VkSwapchainKHR sc;
+
     const VkResult CreateResult =
-        vkCreateSwapchainKHR(logicalDevice, &createInfo, nullptr, &swapChain);
+        vkCreateSwapchainKHR(logicalDevice, &createInfo, nullptr, &sc);
 
     if (CreateResult != VK_SUCCESS) {
         throw std::runtime_error("Failed to create swap chain");
     }
 
-    // Retrieve swap chain images
-    uint32_t imageCount = 0;
-    vkGetSwapchainImagesKHR(logicalDevice, swapChain, &imageCount, nullptr);
-    swapChainImages.resize(imageCount);
-    vkGetSwapchainImagesKHR(logicalDevice, swapChain, &imageCount,
-                            swapChainImages.data());
-
-    swapChainImageFormat = createInfo.imageFormat;
-    swapChainExtent = createInfo.imageExtent;
+    swapChain = std::make_shared<FVulkanSwapChain>(sc);
+    swapChain->Init(logicalDevice, createInfo);
 }
 
 void FVulkanGPU::CreateDeviceQueue()
