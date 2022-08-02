@@ -11,6 +11,9 @@
 const std::vector<const char*> validationLayers = {
     "VK_LAYER_KHRONOS_validation"};
 
+const std::vector<const char*> deviceExtensions = {
+    VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+
 void GameEngine::createInstance()
 {
     if (GE_VALIDATION_LAYERS && !checkValidationLayerSupport()) {
@@ -109,7 +112,9 @@ void GameEngine::pickPhysicalDevice()
 
         QueueFamilyIndices indices = findQueueFamilies(device);
 
-        return indices.isValid();
+        const bool isExtensionSupported = checkDeviceExtensionSupport(device);
+
+        return indices.isValid() && isExtensionSupported;
     };
 
     for (const VkPhysicalDevice& device : devices) {
@@ -161,6 +166,14 @@ void GameEngine::createLogicalDevice()
         createInfo.enabledLayerCount = 0;
     }
 
+    std::vector<const char*> extensionNames = {};
+
+    // Swapchain
+    extensionNames.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+
+    createInfo.enabledExtensionCount = extensionNames.size();
+    createInfo.ppEnabledExtensionNames = extensionNames.data();
+
     const VkResult CreateResult =
         vkCreateDevice(physicalDevice, &createInfo, nullptr, &logicalDevice);
 
@@ -205,7 +218,7 @@ QueueFamilyIndices GameEngine::findQueueFamilies(const VkPhysicalDevice device)
     return indices;
 }
 
-bool GameEngine::checkValidationLayerSupport()
+bool GameEngine::checkValidationLayerSupport() const
 {
     uint32_t layerCount = 0;
     vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
@@ -234,4 +247,25 @@ bool GameEngine::checkValidationLayerSupport()
         }
     }
     return true;
+}
+
+bool GameEngine::checkDeviceExtensionSupport(VkPhysicalDevice device) const
+{
+    uint32_t extensionCount = 0;
+    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount,
+                                         nullptr);
+
+    std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount,
+                                         availableExtensions.data());
+
+    std::set<std::string> requiredExtensions(deviceExtensions.begin(),
+                                             deviceExtensions.end());
+
+    for (const VkExtensionProperties& extensionProperties :
+         availableExtensions) {
+        requiredExtensions.erase(extensionProperties.extensionName);
+    }
+
+    return requiredExtensions.empty();
 }

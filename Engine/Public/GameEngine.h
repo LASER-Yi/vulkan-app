@@ -28,7 +28,8 @@ class GameEngine
     void pickPhysicalDevice();
     void createLogicalDevice();
     QueueFamilyIndices findQueueFamilies(const VkPhysicalDevice device);
-    bool checkValidationLayerSupport();
+    bool checkValidationLayerSupport() const;
+    bool checkDeviceExtensionSupport(VkPhysicalDevice device) const;
 
   private:
     GLFWwindow* window;
