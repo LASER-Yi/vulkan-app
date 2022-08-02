@@ -15,6 +15,10 @@ class FVulkanSwapChain
   protected:
     VkSwapchainKHR swapChain;
     std::vector<VkImage> Images;
+    std::vector<VkImageView> ImageViews;
     VkFormat ImageFormat;
     VkExtent2D Extent;
+
+  private:
+    void CreateImageViews(VkDevice logicalDevice);
 };
