@@ -6,9 +6,9 @@ A self-learning project of Vulkan
 
 1. Download and install [VulkanSDK](https://vulkan.lunarg.com/sdk/home) in your computer
 
-2. Clone this project with submodules
+2. Clone this project
 
-   `git clone --recurse-submodules https://github.com/LASER-Yi/vulkan-app.git`
+   `git clone https://github.com/LASER-Yi/vulkan-app.git`
 
 3. Configure and build with CMake
 

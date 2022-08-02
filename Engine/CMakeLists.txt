@@ -14,13 +14,11 @@ add_library(${PROJECT_NAME} ${TARGET_SOURCES} ${TARGET_HEADERS})
 target_include_directories(${PROJECT_NAME} PUBLIC ${TARGET_HEADERS_DIR})
 
 if (Vulkan_FOUND)
-    target_include_directories(${PROJECT_NAME} PUBLIC ${Vulkan_INCLUDE_DIRS})
+    target_include_directories(${PROJECT_NAME} INTERFACE ${Vulkan_INCLUDE_DIRS})
     target_link_libraries(${PROJECT_NAME} PRIVATE Vulkan::Vulkan)
 else()
     message(FATAL_ERROR "Cannot find Vulkan SDK")
 endif()
 
-set(GLFW_INCLUDE_DIR "${THRID_PARTY_SOURCE_DIR}/glfw/include")
-
-target_include_directories(${PROJECT_NAME} PUBLIC ${GLFW_INCLUDE_DIR})
+target_include_directories(${PROJECT_NAME} INTERFACE ${GLFW_INCLUDE_DIR})
 target_link_libraries(${PROJECT_NAME} PRIVATE glfw)
