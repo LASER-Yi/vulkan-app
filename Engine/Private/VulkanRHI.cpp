@@ -247,6 +247,16 @@ void GameEngine::createSwapChain()
     if (CreateResult != VK_SUCCESS) {
         throw std::runtime_error("Failed to create swap chain");
     }
+
+    // Retrieve swap chain images
+    uint32_t imageCount = 0;
+    vkGetSwapchainImagesKHR(logicalDevice, swapChain, &imageCount, nullptr);
+    swapChainImages.resize(imageCount);
+    vkGetSwapchainImagesKHR(logicalDevice, swapChain, &imageCount,
+                            swapChainImages.data());
+
+    swapChainImageFormat = createInfo.imageFormat;
+    swapChainExtent = createInfo.imageExtent;
 }
 
 QueueFamilyIndices GameEngine::findQueueFamilies(const VkPhysicalDevice device)

@@ -17,5 +17,5 @@ list(APPEND CMAKE_MODULE_PATH
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 # Projects
-add_subdirectory(engine)
+add_subdirectory(Engine)
 add_subdirectory(app)

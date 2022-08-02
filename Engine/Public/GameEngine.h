@@ -1,3 +1,5 @@
+#include <array>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 #define GLFW_INCLUDE_VULKAN
 #include "GLFW/glfw3.h"
@@ -43,5 +45,9 @@ class GameEngine
 
     VkSurfaceKHR surface;
     VkQueue presentQueue;
+
     VkSwapchainKHR swapChain;
+    std::vector<VkImage> swapChainImages;
+    VkFormat swapChainImageFormat;
+    VkExtent2D swapChainExtent;
 };
