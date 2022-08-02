@@ -1,6 +1,7 @@
 #include "Vulkan/SwapChainSupportDetails.h"
 #include "GLFW/glfw3.h"
 #include <algorithm>
+#include <cassert>
 #include <limits>
 #include <stdint.h>
 #include <vulkan/vulkan_core.h>
@@ -85,6 +86,7 @@ VkExtent2D SwapChainSupportDetails::GetRequiredExtent(GLFWwindow* window) const
         std::numeric_limits<uint32_t>::max()) {
         return capabilities.currentExtent;
     } else {
+        assert(false);
         int width, height;
         glfwGetFramebufferSize(window, &width, &height);
 

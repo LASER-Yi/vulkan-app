@@ -13,8 +13,6 @@ class FVulkanInstance
     FVulkanInstance();
     ~FVulkanInstance();
 
-    void SetOwner(FVulkanRHI* RHI);
-
     static std::vector<const char*> validationLayers;
 
     void Init(GLFWwindow* window);
@@ -23,15 +21,11 @@ class FVulkanInstance
     VkInstance Get() const;
     std::vector<FVulkanGPU> GetGPUs() const;
 
-    VkSurfaceKHR GetSurface() const;
-
   protected:
     VkInstance instance;
     VkSurfaceKHR surface;
 
     std::shared_ptr<FVulkanGPU> device;
-
-    FVulkanRHI* Owner;
 
   private:
     bool SupportValidationLayer() const;

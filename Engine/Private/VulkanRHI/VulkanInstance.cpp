@@ -5,7 +5,6 @@
 #include <vector>
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_core.h>
-#include <vulkan/vulkan_handles.hpp>
 
 #include "Definition.h"
 #include "GLFW/glfw3.h"
@@ -18,8 +17,6 @@ std::vector<const char*> FVulkanInstance::validationLayers = {
 FVulkanInstance::FVulkanInstance() {}
 
 FVulkanInstance::~FVulkanInstance() { vkDestroyInstance(instance, nullptr); }
-
-void FVulkanInstance::SetOwner(FVulkanRHI* RHI) { Owner = RHI; }
 
 VkInstance FVulkanInstance::Get() const { return instance; }
 
@@ -39,20 +36,13 @@ std::vector<FVulkanGPU> FVulkanInstance::GetGPUs() const
     vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
 
     std::vector<FVulkanGPU> gpus;
-
-    for (auto device : devices) {
-        FVulkanGPU gpu = device;
-
-        // TODO: Improve ME
-        gpu.SetOwner(Owner->GetInstance());
-
-        gpus.push_back(gpu);
+    gpus.reserve(devices.size());
+    for (const auto& device : devices) {
+        gpus.emplace_back(FVulkanGPU(device, surface));
     }
 
     return std::move(gpus);
 }
-
-VkSurfaceKHR FVulkanInstance::GetSurface() const { return surface; }
 
 bool FVulkanInstance::SupportValidationLayer() const
 {
@@ -88,6 +78,7 @@ void FVulkanInstance::Init(GLFWwindow* window)
 
     CreateInstance();
     CreateSurface(window);
+    SelectGPU();
 }
 
 void FVulkanInstance::SelectGPU()
@@ -106,6 +97,8 @@ void FVulkanInstance::SelectGPU()
     if (device == VK_NULL_HANDLE) {
         throw std::runtime_error("Failed to find a suitable GPU!");
     }
+
+    device->Init();
 }
 
 void FVulkanInstance::CreateInstance()

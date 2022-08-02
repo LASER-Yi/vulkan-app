@@ -1,19 +1,26 @@
-#include "Vulkan/QueueFamilyIndices.h"
-#include <memory>
 #include <vector>
-#include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
 
+#include "Vulkan/QueueFamilyIndices.h"
+
 class FVulkanInstance;
+
+struct FVulkanGPUCreateParam {
+
+public:
+    VkPhysicalDevice physicalDevice;
+    VkSurfaceKHR surface;
+};
 
 // Physical Device Wrapper
 class FVulkanGPU
 {
   public:
-    FVulkanGPU(VkPhysicalDevice device);
+    FVulkanGPU(VkPhysicalDevice device, VkSurfaceKHR surface);
     ~FVulkanGPU();
 
-    void SetOwner(FVulkanInstance* Instance);
+    void Init();
+    bool IsInit() const;
 
     QueueFamilyIndices GetQueueFamilies() const;
     const VkPhysicalDeviceProperties GetProperties() const;
@@ -26,6 +33,15 @@ class FVulkanGPU
 
   protected:
     VkPhysicalDevice device;
+    VkSurfaceKHR surface;
 
-    FVulkanInstance* Owner;
+    VkQueue graphicsQueue;
+    VkQueue presentQueue;
+    VkDevice logicalDevice;
+
+    VkSwapchainKHR swapChain;
+    std::vector<VkImage> swapChainImages;
+    VkFormat swapChainImageFormat;
+    VkExtent2D swapChainExtent;
+    void CreateSwapChain();
 };
