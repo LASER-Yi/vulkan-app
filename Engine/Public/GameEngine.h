@@ -1,7 +1,9 @@
+#include <vulkan/vulkan_core.h>
 #define GLFW_INCLUDE_VULKAN
 #include "GLFW/glfw3.h"
 
 #include "Vulkan/QueueFamilyIndices.h"
+#include "Vulkan/SwapChainSupportDetails.h"
 
 class GameEngine
 {
@@ -27,6 +29,7 @@ class GameEngine
     void createInstance();
     void pickPhysicalDevice();
     void createLogicalDevice();
+    void createSwapChain();
     QueueFamilyIndices findQueueFamilies(const VkPhysicalDevice device);
     bool checkValidationLayerSupport() const;
     bool checkDeviceExtensionSupport(VkPhysicalDevice device) const;
@@ -40,4 +43,5 @@ class GameEngine
 
     VkSurfaceKHR surface;
     VkQueue presentQueue;
+    VkSwapchainKHR swapChain;
 };

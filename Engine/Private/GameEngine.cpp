@@ -4,6 +4,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <vector>
+#include <vulkan/vulkan_core.h>
 
 #include "Definition.h"
 
@@ -44,6 +45,9 @@ void GameEngine::initRHI()
     createLogicalDevice();
     assert(logicalDevice != VK_NULL_HANDLE);
     assert(graphicsQueue != VK_NULL_HANDLE);
+
+    createSwapChain();
+    assert(swapChain != VK_NULL_HANDLE);
 }
 
 void GameEngine::createWindowSurface()
@@ -71,6 +75,7 @@ void GameEngine::render()
 
 void GameEngine::cleanup()
 {
+    vkDestroySwapchainKHR(logicalDevice, swapChain, nullptr);
     vkDestroySurfaceKHR(instance, surface, nullptr);
     vkDestroyDevice(logicalDevice, nullptr);
     vkDestroyInstance(instance, nullptr);

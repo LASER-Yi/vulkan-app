@@ -6,7 +6,9 @@
 #include <optional>
 #include <set>
 #include <stdexcept>
+#include <stdint.h>
 #include <vector>
+#include <vulkan/vulkan_core.h>
 
 const std::vector<const char*> validationLayers = {
     "VK_LAYER_KHRONOS_validation"};
@@ -114,7 +116,15 @@ void GameEngine::pickPhysicalDevice()
 
         const bool isExtensionSupported = checkDeviceExtensionSupport(device);
 
-        return indices.isValid() && isExtensionSupported;
+        bool swapChainAdequate = false;
+        if (isExtensionSupported) {
+            SwapChainSupportDetails swapChainSupport(device, surface);
+
+            swapChainAdequate = !swapChainSupport.formats.empty() &&
+                                !swapChainSupport.presentModes.empty();
+        }
+
+        return indices.isValid() && isExtensionSupported && swapChainAdequate;
     };
 
     for (const VkPhysicalDevice& device : devices) {
@@ -169,7 +179,9 @@ void GameEngine::createLogicalDevice()
     std::vector<const char*> extensionNames = {};
 
     // Swapchain
-    extensionNames.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    {
+        extensionNames.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    }
 
     createInfo.enabledExtensionCount = extensionNames.size();
     createInfo.ppEnabledExtensionNames = extensionNames.data();
@@ -185,6 +197,56 @@ void GameEngine::createLogicalDevice()
                      &graphicsQueue);
     vkGetDeviceQueue(logicalDevice, indices.presentFamily.value(), 0,
                      &presentQueue);
+}
+
+void GameEngine::createSwapChain()
+{
+    const SwapChainSupportDetails details(physicalDevice, surface);
+
+    assert(details.IsValid());
+
+    const VkSurfaceFormatKHR surfaceFormat = details.GetRequiredSurfaceFormat();
+
+    VkSwapchainCreateInfoKHR createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    createInfo.surface = surface;
+    createInfo.minImageCount = details.GetImageCount();
+
+    createInfo.presentMode = details.GetRequiredPresentMode();
+    createInfo.clipped = VK_TRUE;
+
+    createInfo.imageFormat = surfaceFormat.format;
+    createInfo.imageColorSpace = surfaceFormat.colorSpace;
+
+    createInfo.imageExtent = details.GetRequiredExtent(window);
+
+    createInfo.imageArrayLayers = 1;
+    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+
+    const uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(),
+                                           indices.presentFamily.value()};
+
+    if (indices.graphicsFamily != indices.presentFamily) {
+        createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+        createInfo.queueFamilyIndexCount = 2;
+        createInfo.pQueueFamilyIndices = queueFamilyIndices;
+    } else {
+        createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    }
+
+    createInfo.preTransform = details.capabilities.currentTransform;
+    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+
+    createInfo.oldSwapchain = VK_NULL_HANDLE;
+
+    const VkResult CreateResult =
+        vkCreateSwapchainKHR(logicalDevice, &createInfo, nullptr, &swapChain);
+
+    if (CreateResult != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create swap chain");
+    }
 }
 
 QueueFamilyIndices GameEngine::findQueueFamilies(const VkPhysicalDevice device)
