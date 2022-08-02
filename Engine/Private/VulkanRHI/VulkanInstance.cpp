@@ -16,11 +16,13 @@ std::vector<const char*> FVulkanInstance::validationLayers = {
 
 FVulkanInstance::FVulkanInstance() {}
 
-FVulkanInstance::~FVulkanInstance() { vkDestroyInstance(instance, nullptr); }
+FVulkanInstance::~FVulkanInstance()
+{
+    device.reset();
+    vkDestroyInstance(instance, nullptr);
+}
 
-VkInstance FVulkanInstance::Get() const { return instance; }
-
-std::vector<FVulkanGPU> FVulkanInstance::GetGPUs() const
+std::vector<FVulkanGPUCreateParam> FVulkanInstance::GetGPUs() const
 {
     assert(instance != VK_NULL_HANDLE);
     assert(surface != VK_NULL_HANDLE);
@@ -35,10 +37,15 @@ std::vector<FVulkanGPU> FVulkanInstance::GetGPUs() const
     std::vector<VkPhysicalDevice> devices(deviceCount);
     vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
 
-    std::vector<FVulkanGPU> gpus;
+    std::vector<FVulkanGPUCreateParam> gpus;
     gpus.reserve(devices.size());
     for (const auto& device : devices) {
-        gpus.emplace_back(FVulkanGPU(device, surface));
+        FVulkanGPUCreateParam param;
+        param.device = device;
+        param.surface = surface;
+        param.layers = enabledLayers;
+
+        gpus.emplace_back(param);
     }
 
     return std::move(gpus);
@@ -87,7 +94,7 @@ void FVulkanInstance::SelectGPU()
     const auto gpus = GetGPUs();
 
     // Simplest solution
-    for (const FVulkanGPU& gpu : gpus) {
+    for (const FVulkanGPUCreateParam& gpu : gpus) {
         if (gpu.IsValid()) {
             device = std::make_shared<FVulkanGPU>(gpu);
             break;
@@ -97,8 +104,6 @@ void FVulkanInstance::SelectGPU()
     if (device == VK_NULL_HANDLE) {
         throw std::runtime_error("Failed to find a suitable GPU!");
     }
-
-    device->Init();
 }
 
 void FVulkanInstance::CreateInstance()
@@ -119,46 +124,48 @@ void FVulkanInstance::CreateInstance()
     std::vector<VkExtensionProperties> extensions =
         FVulkanRHI::GetAvailableExtensions();
 
+#if BUILD_DEBUG
     std::cout << "Available extensions:" << std::endl;
     for (const VkExtensionProperties& extension : extensions) {
         std::cout << "\t" << extension.extensionName << std::endl;
     }
+#endif
 
     VkInstanceCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
 
-    std::vector<const char*> extensionNames = {};
+    enabledExtensions.clear();
     {
         uint32_t glfwExtensionCount = 0;
         const char** glfwExtensions =
             glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
         for (size_t i = 0; i < glfwExtensionCount; i++) {
-            extensionNames.push_back(glfwExtensions[i]);
+            enabledExtensions.push_back(glfwExtensions[i]);
         }
     }
 
-    std::vector<const char*> layerNames = {};
+    enabledLayers.clear();
 
     if (GE_VALIDATION_LAYERS) {
-        layerNames.insert(layerNames.end(), validationLayers.begin(),
-                          validationLayers.end());
+        enabledLayers.insert(enabledLayers.end(), validationLayers.begin(),
+                             validationLayers.end());
     }
 
 // Workaround for VK_ERROR_INCOMPATIBLE_DRIVER
 #if WITH_MOLTEN_VK
     createInfo.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
-    extensionNames.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
-    extensionNames.push_back(
+    enabledExtensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+    enabledExtensions.push_back(
         VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 #endif
 
-    createInfo.enabledExtensionCount = extensionNames.size();
-    createInfo.ppEnabledExtensionNames = extensionNames.data();
+    createInfo.enabledExtensionCount = enabledExtensions.size();
+    createInfo.ppEnabledExtensionNames = enabledExtensions.data();
 
-    createInfo.enabledLayerCount = layerNames.size();
-    createInfo.ppEnabledLayerNames = layerNames.data();
+    createInfo.enabledLayerCount = enabledLayers.size();
+    createInfo.ppEnabledLayerNames = enabledLayers.data();
 
     const VkResult CreateResult =
         vkCreateInstance(&createInfo, nullptr, &instance);

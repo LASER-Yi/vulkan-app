@@ -1,4 +1,4 @@
-#include "Vulkan/SwapChainSupportDetails.h"
+#include "VulkanRHI/SwapChainSupportDetails.h"
 #include "GLFW/glfw3.h"
 #include <algorithm>
 #include <cassert>

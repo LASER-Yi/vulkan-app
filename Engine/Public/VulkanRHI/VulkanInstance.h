@@ -4,6 +4,7 @@
 #include <vulkan/vulkan_core.h>
 
 class FVulkanGPU;
+class FVulkanGPUCreateParam;
 class FVulkanRHI;
 class GLFWwindow;
 
@@ -18,14 +19,15 @@ class FVulkanInstance
     void Init(GLFWwindow* window);
 
   public:
-    VkInstance Get() const;
-    std::vector<FVulkanGPU> GetGPUs() const;
+    std::vector<FVulkanGPUCreateParam> GetGPUs() const;
 
   protected:
     VkInstance instance;
     VkSurfaceKHR surface;
-
     std::shared_ptr<FVulkanGPU> device;
+
+    std::vector<const char*> enabledLayers;
+    std::vector<const char*> enabledExtensions;
 
   private:
     bool SupportValidationLayer() const;

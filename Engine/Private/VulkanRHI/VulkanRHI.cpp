@@ -1,4 +1,5 @@
 #include "VulkanRHI/VulkanRHI.h"
+#include <iostream>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -13,6 +14,8 @@ FVulkanRHI::FVulkanRHI() {}
 
 FVulkanRHI::~FVulkanRHI()
 {
+    Instance.reset();
+
     glfwDestroyWindow(window);
     window = nullptr;
 }

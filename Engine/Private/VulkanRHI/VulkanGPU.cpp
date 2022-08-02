@@ -1,105 +1,27 @@
 #include "VulkanRHI/VulkanGPU.h"
 
 #include "Definition.h"
-#include "Vulkan/SwapChainSupportDetails.h"
 
+#include <cassert>
+#include <iostream>
 #include <memory>
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
+#include "VulkanRHI/SwapChainSupportDetails.h"
 #include "VulkanRHI/VulkanInstance.h"
 
-#include <cassert>
-#include <stdexcept>
-
 const std::vector<const char*> requiredExtensions = {
-    VK_KHR_SWAPCHAIN_EXTENSION_NAME
-};
+    VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
-FVulkanGPU::FVulkanGPU(VkPhysicalDevice device, VkSurfaceKHR surface) : device(device), surface(surface), logicalDevice(VK_NULL_HANDLE) {}
+FVulkanGPUCreateParam::FVulkanGPUCreateParam() {}
 
-FVulkanGPU::~FVulkanGPU()
+QueueFamilyIndices FVulkanGPUCreateParam::GetQueueFamilies() const
 {
-    device = VK_NULL_HANDLE;
-
-    if (IsInit()) {
-        vkDestroyDevice(logicalDevice, nullptr);
-    }
-}
-
-void FVulkanGPU::Init()
-{
-    assert(device != VK_NULL_HANDLE);
-
-    const QueueFamilyIndices indices = GetQueueFamilies();
-    std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-
-    const std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily.value(),
-                                              indices.presentFamily.value()};
-
-    constexpr float queuePriority = 1.0f;
-    for (const uint32_t queueFamily : uniqueQueueFamilies) {
-        VkDeviceQueueCreateInfo queueCreateInfo = {};
-        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-        queueCreateInfo.queueFamilyIndex = queueFamily;
-        queueCreateInfo.queueCount = 1;
-        queueCreateInfo.pQueuePriorities = &queuePriority;
-        queueCreateInfos.push_back(queueCreateInfo);
-    }
-
-        VkPhysicalDeviceFeatures deviceFeatures = {};
-
-    VkDeviceCreateInfo createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-
-    createInfo.queueCreateInfoCount = queueCreateInfos.size();
-    createInfo.pQueueCreateInfos = queueCreateInfos.data();
-
-    createInfo.pEnabledFeatures = &deviceFeatures;
-
-    if (GE_VALIDATION_LAYERS) {
-        // createInfo.enabledLayerCount = validationLayers.size();
-        // createInfo.ppEnabledLayerNames = validationLayers.data();
-    } else {
-        createInfo.enabledLayerCount = 0;
-    }
-
-    std::vector<const char*> extensionNames = {};
-
-    // Swapchain
-    {
-        extensionNames.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-    }
-
-    createInfo.enabledExtensionCount = extensionNames.size();
-    createInfo.ppEnabledExtensionNames = extensionNames.data();
-
-    const VkResult CreateResult =
-        vkCreateDevice(device, &createInfo, nullptr, &logicalDevice);
-
-    if (CreateResult != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create logical device!");
-    }
-
-    vkGetDeviceQueue(logicalDevice, indices.graphicsFamily.value(), 0,
-                     &graphicsQueue);
-    vkGetDeviceQueue(logicalDevice, indices.presentFamily.value(), 0,
-                     &presentQueue);
-
-    CreateSwapChain();
-}
-
-bool FVulkanGPU::IsInit() const
-{
-    return logicalDevice != VK_NULL_HANDLE;
-}
-
-QueueFamilyIndices FVulkanGPU::GetQueueFamilies() const
-{
-
     QueueFamilyIndices indices;
 
     uint32_t queueFamilyCount = 0;
@@ -131,7 +53,7 @@ QueueFamilyIndices FVulkanGPU::GetQueueFamilies() const
     return indices;
 }
 
-const VkPhysicalDeviceProperties FVulkanGPU::GetProperties() const
+const VkPhysicalDeviceProperties FVulkanGPUCreateParam::GetProperties() const
 {
     VkPhysicalDeviceProperties properties;
     vkGetPhysicalDeviceProperties(device, &properties);
@@ -139,7 +61,7 @@ const VkPhysicalDeviceProperties FVulkanGPU::GetProperties() const
     return std::move(properties);
 }
 
-const VkPhysicalDeviceFeatures FVulkanGPU::GetFeatures() const
+const VkPhysicalDeviceFeatures FVulkanGPUCreateParam::GetFeatures() const
 {
     VkPhysicalDeviceFeatures features;
     vkGetPhysicalDeviceFeatures(device, &features);
@@ -147,7 +69,7 @@ const VkPhysicalDeviceFeatures FVulkanGPU::GetFeatures() const
     return std::move(features);
 }
 
-std::vector<VkExtensionProperties> FVulkanGPU::GetExtensions() const
+std::vector<VkExtensionProperties> FVulkanGPUCreateParam::GetExtensions() const
 {
     uint32_t extensionCount = 0;
     vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount,
@@ -160,7 +82,7 @@ std::vector<VkExtensionProperties> FVulkanGPU::GetExtensions() const
     return std::move(extensions);
 }
 
-bool FVulkanGPU::IsValid() const
+bool FVulkanGPUCreateParam::IsValid() const
 {
     const auto extensions = GetExtensions();
 
@@ -178,7 +100,7 @@ bool FVulkanGPU::IsValid() const
     return IsExtensionAvailable && indices.isValid();
 }
 
-uint32_t FVulkanGPU::GetScore() const
+uint32_t FVulkanGPUCreateParam::GetScore() const
 {
     const VkPhysicalDeviceProperties properties = GetProperties();
     const VkPhysicalDeviceFeatures features = GetFeatures();
@@ -199,8 +121,85 @@ uint32_t FVulkanGPU::GetScore() const
     return score;
 }
 
-void FVulkanGPU::CreateSwapChain()
+// BEGIN: Vulkan GPU
+FVulkanGPU::FVulkanGPU(const FVulkanGPUCreateParam& Param) { Init(Param); }
+
+FVulkanGPU::~FVulkanGPU()
 {
+    vkDestroyDevice(logicalDevice, nullptr);
+    device = VK_NULL_HANDLE;
+}
+
+void FVulkanGPU::Init(const FVulkanGPUCreateParam& Param)
+{
+    assert(Param.IsValid());
+
+    device = Param.device;
+    indices = Param.GetQueueFamilies();
+
+    CreateLogicalDevice(Param);
+    CreateSwapChain(Param);
+
+    CreateDeviceQueue();
+}
+
+void FVulkanGPU::CreateLogicalDevice(const FVulkanGPUCreateParam& Param)
+{
+    assert(Param.IsValid());
+
+    std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+
+    const std::set<uint32_t> uniqueQueueFamilies = {
+        indices.graphicsFamily.value(), indices.presentFamily.value()};
+
+    constexpr float queuePriority = 1.0f;
+    for (const uint32_t queueFamily : uniqueQueueFamilies) {
+        VkDeviceQueueCreateInfo queueCreateInfo = {};
+        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        queueCreateInfo.queueFamilyIndex = queueFamily;
+        queueCreateInfo.queueCount = 1;
+        queueCreateInfo.pQueuePriorities = &queuePriority;
+        queueCreateInfos.push_back(queueCreateInfo);
+    }
+
+    VkPhysicalDeviceFeatures deviceFeatures = {};
+
+    VkDeviceCreateInfo createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+
+    createInfo.queueCreateInfoCount = queueCreateInfos.size();
+    createInfo.pQueueCreateInfos = queueCreateInfos.data();
+
+    createInfo.pEnabledFeatures = &deviceFeatures;
+
+    if (GE_VALIDATION_LAYERS) {
+        createInfo.enabledLayerCount = Param.layers.size();
+        createInfo.ppEnabledLayerNames = Param.layers.data();
+    } else {
+        createInfo.enabledLayerCount = 0;
+    }
+
+    std::vector<const char*> extensionNames = {};
+
+    // Swapchain
+    extensionNames.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+
+    createInfo.enabledExtensionCount = extensionNames.size();
+    createInfo.ppEnabledExtensionNames = extensionNames.data();
+
+    const VkResult CreateResult =
+        vkCreateDevice(device, &createInfo, nullptr, &logicalDevice);
+
+    if (CreateResult != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create logical device!");
+    }
+}
+
+void FVulkanGPU::CreateSwapChain(const FVulkanGPUCreateParam& Param)
+{
+    assert(Param.IsValid());
+    VkSurfaceKHR surface = Param.surface;
+
     const SwapChainSupportDetails details(device, surface);
 
     assert(details.IsValid());
@@ -223,8 +222,6 @@ void FVulkanGPU::CreateSwapChain()
 
     createInfo.imageArrayLayers = 1;
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-    const QueueFamilyIndices indices = GetQueueFamilies();
 
     const uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(),
                                            indices.presentFamily.value()};
@@ -258,4 +255,14 @@ void FVulkanGPU::CreateSwapChain()
 
     swapChainImageFormat = createInfo.imageFormat;
     swapChainExtent = createInfo.imageExtent;
+}
+
+void FVulkanGPU::CreateDeviceQueue()
+{
+    assert(logicalDevice != VK_NULL_HANDLE);
+
+    vkGetDeviceQueue(logicalDevice, indices.graphicsFamily.value(), 0,
+                     &graphicsQueue);
+    vkGetDeviceQueue(logicalDevice, indices.presentFamily.value(), 0,
+                     &presentQueue);
 }
