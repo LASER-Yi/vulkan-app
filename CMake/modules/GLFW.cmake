@@ -15,3 +15,6 @@ option(GLFW_INSTALL "" OFF)
 FetchContent_MakeAvailable(glfw)
 set(GLFW_INCLUDE_DIR "${glfw_SOURCE_DIR}/include")
 set(GLFW_SRC_DIR "${glfw_SOURCE_DIR}/src")
+
+add_compile_definitions(WITH_GLFW)
+add_compile_definitions(GLFW_INCLUDE_VULKAN)

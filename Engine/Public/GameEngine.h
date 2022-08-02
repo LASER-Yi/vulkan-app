@@ -1,11 +1,12 @@
+#include "GLFW/glfw3.h"
 #include <array>
+#include <memory>
 #include <vector>
 #include <vulkan/vulkan_core.h>
-#define GLFW_INCLUDE_VULKAN
-#include "GLFW/glfw3.h"
 
 #include "Vulkan/QueueFamilyIndices.h"
 #include "Vulkan/SwapChainSupportDetails.h"
+#include "VulkanRHI/VulkanRHI.h"
 
 class GameEngine
 {
@@ -23,8 +24,11 @@ class GameEngine
 
     void createWindowSurface();
 
-    void render();
+    void tick();
     void cleanup();
+
+  private:
+    std::shared_ptr<FVulkanRHI> RHI;
 
   private:
     // Vulkan related initialization

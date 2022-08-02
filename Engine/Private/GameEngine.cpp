@@ -2,14 +2,12 @@
 
 #include <cassert>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
 #include "Definition.h"
-
-constexpr uint32_t WIDTH = 800;
-constexpr uint32_t HEIGHT = 600;
 
 GameEngine::GameEngine() : physicalDevice(VK_NULL_HANDLE) {}
 
@@ -18,21 +16,19 @@ GameEngine::~GameEngine() {}
 void GameEngine::run()
 {
     init();
-    render();
+    tick();
     cleanup();
 }
 
-void GameEngine::initWindow()
-{
-    glfwInit();
-
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-    window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan window", nullptr, nullptr);
-}
+void GameEngine::initWindow() {}
 
 void GameEngine::initRHI()
 {
+    RHI = std::make_shared<FVulkanRHI>();
+
+    RHI->Init();
+
+    return;
     createInstance();
     assert(instance != VK_NULL_HANDLE);
 
@@ -66,15 +62,11 @@ void GameEngine::init()
     initRHI();
 }
 
-void GameEngine::render()
-{
-    while (!glfwWindowShouldClose(window)) {
-        glfwPollEvents();
-    }
-}
+void GameEngine::tick() { RHI->Render(); }
 
 void GameEngine::cleanup()
 {
+    return;
     vkDestroySwapchainKHR(logicalDevice, swapChain, nullptr);
     vkDestroySurfaceKHR(instance, surface, nullptr);
     vkDestroyDevice(logicalDevice, nullptr);
