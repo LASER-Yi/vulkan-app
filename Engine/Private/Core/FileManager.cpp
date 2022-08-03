@@ -3,7 +3,6 @@
 #include <fstream>
 #include <stdexcept>
 #include <stdint.h>
-#include <vcruntime.h>
 #include <vector>
 
 FileBlob::FileBlob(const std::vector<char>& inBlob) : blob(inBlob) {}
