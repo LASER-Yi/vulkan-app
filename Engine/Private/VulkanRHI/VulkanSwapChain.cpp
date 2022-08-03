@@ -1,4 +1,5 @@
 #include "VulkanRHI/VulkanSwapChain.h"
+#include "VulkanRHI/VulkanCommon.h"
 #include <cassert>
 #include <stdexcept>
 
@@ -46,6 +47,7 @@ void FVulkanSwapChain::CreateImageViews(VkDevice logicalDevice)
 
     for (size_t i = 0; i < Images.size(); i++) {
         VkImageViewCreateInfo createInfo = {};
+        ZeroVulkanStruct(createInfo, VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO);
         createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         createInfo.image = Images[i];
 

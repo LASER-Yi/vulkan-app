@@ -8,6 +8,7 @@
 
 #include "Definition.h"
 #include "GLFW/glfw3.h"
+#include "VulkanRHI/VulkanCommon.h"
 #include "VulkanRHI/VulkanGPU.h"
 #include "VulkanRHI/VulkanRHI.h"
 
@@ -114,6 +115,7 @@ void FVulkanInstance::CreateInstance()
     }
 
     VkApplicationInfo appInfo = {};
+    ZeroVulkanStruct(appInfo, VK_STRUCTURE_TYPE_APPLICATION_INFO);
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "Vulkan Game Engine";
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -132,6 +134,7 @@ void FVulkanInstance::CreateInstance()
 #endif
 
     VkInstanceCreateInfo createInfo = {};
+    ZeroVulkanStruct(createInfo, VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO);
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
 

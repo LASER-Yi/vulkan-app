@@ -1,4 +1,5 @@
 #include "VulkanRHI/VulkanShader.h"
+#include "VulkanRHI/VulkanCommon.h"
 #include <memory>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
@@ -19,6 +20,7 @@ FVulkanShader::Create(VkDevice device, const std::string& filename)
     const FileBlob blob = FileManager::ReadFile(filename);
 
     VkShaderModuleCreateInfo createInfo = {};
+    ZeroVulkanStruct(createInfo, VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO);
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     createInfo.codeSize = blob.GetFileSize();
     createInfo.pCode = blob.GetData();

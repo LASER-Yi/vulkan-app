@@ -2,7 +2,9 @@
 
 #include "Definition.h"
 
+#include <algorithm>
 #include <cassert>
+#include <cstring>
 #include <iostream>
 #include <memory>
 #include <set>
@@ -13,6 +15,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include "VulkanRHI/SwapChainSupportDetails.h"
+#include "VulkanRHI/VulkanCommon.h"
 #include "VulkanRHI/VulkanInstance.h"
 #include "VulkanRHI/VulkanSwapChain.h"
 
@@ -159,6 +162,8 @@ void FVulkanGPU::CreateLogicalDevice(const FVulkanGPUCreateParam& Param)
     constexpr float queuePriority = 1.0f;
     for (const uint32_t queueFamily : uniqueQueueFamilies) {
         VkDeviceQueueCreateInfo queueCreateInfo = {};
+        ZeroVulkanStruct(queueCreateInfo,
+                         VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO);
         queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         queueCreateInfo.queueFamilyIndex = queueFamily;
         queueCreateInfo.queueCount = 1;
@@ -169,6 +174,7 @@ void FVulkanGPU::CreateLogicalDevice(const FVulkanGPUCreateParam& Param)
     VkPhysicalDeviceFeatures deviceFeatures = {};
 
     VkDeviceCreateInfo createInfo = {};
+    ZeroVulkanStruct(createInfo, VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO);
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 
     createInfo.queueCreateInfoCount = queueCreateInfos.size();
@@ -187,6 +193,18 @@ void FVulkanGPU::CreateLogicalDevice(const FVulkanGPUCreateParam& Param)
 
     // Swapchain
     extensionNames.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+
+#if PLATFORM_APPLE
+    const auto extensions = Param.GetExtensions();
+
+    if (std::find_if(extensions.begin(), extensions.end(),
+                     [](const VkExtensionProperties& properties) {
+                         return strcmp(properties.extensionName,
+                                       "VK_KHR_portability_subset");
+                     }) != extensions.end()) {
+        extensionNames.push_back("VK_KHR_portability_subset");
+    }
+#endif
 
     createInfo.enabledExtensionCount = extensionNames.size();
     createInfo.ppEnabledExtensionNames = extensionNames.data();
@@ -211,6 +229,7 @@ void FVulkanGPU::CreateSwapChain(const FVulkanGPUCreateParam& Param)
     const VkSurfaceFormatKHR surfaceFormat = details.GetRequiredSurfaceFormat();
 
     VkSwapchainCreateInfoKHR createInfo = {};
+    ZeroVulkanStruct(createInfo, VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR);
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     createInfo.surface = surface;
     createInfo.minImageCount = details.GetImageCount();
