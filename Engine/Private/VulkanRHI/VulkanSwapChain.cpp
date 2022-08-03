@@ -1,5 +1,6 @@
 #include "VulkanRHI/VulkanSwapChain.h"
 #include <cassert>
+#include <stdexcept>
 
 FVulkanSwapChain::FVulkanSwapChain(VkSwapchainKHR swapChain)
     : swapChain(swapChain)
