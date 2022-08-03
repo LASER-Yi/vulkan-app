@@ -1,8 +1,10 @@
 #include <memory>
+#include <string>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
 #include "VulkanRHI/QueueFamilyIndices.h"
+#include "VulkanRHI/VulkanShader.h"
 
 class FVulkanInstance;
 class FVulkanSwapChain;
