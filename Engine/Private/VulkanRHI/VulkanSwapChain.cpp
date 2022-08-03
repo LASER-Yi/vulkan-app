@@ -1,49 +1,43 @@
 #include "VulkanRHI/VulkanSwapChain.h"
 #include "VulkanRHI/VulkanCommon.h"
+#include "VulkanRHI/VulkanDevice.h"
 #include <cassert>
 #include <stdexcept>
 
-FVulkanSwapChain::FVulkanSwapChain(VkSwapchainKHR swapChain)
-    : swapChain(swapChain)
+FVulkanSwapChain::FVulkanSwapChain(VkSwapchainKHR swapChain,
+                                   FVulkanDevice* device, VkFormat format,
+                                   VkExtent2D extent)
+    : swapChain(swapChain), logicalDevice(device), ImageFormat(format),
+      Extent(extent)
 {
+    VkDevice _device = logicalDevice->GetDevice();
+
+    uint32_t imageCount = 0;
+    vkGetSwapchainImagesKHR(_device, swapChain, &imageCount, nullptr);
+    Images.resize(imageCount);
+    vkGetSwapchainImagesKHR(_device, swapChain, &imageCount, Images.data());
+
+    CreateImageViews();
 }
 
 FVulkanSwapChain::~FVulkanSwapChain()
 {
-    assert(swapChain == VK_NULL_HANDLE);
-    assert(ImageViews.size() == 0);
-}
+    VkDevice _device = logicalDevice->GetDevice();
 
-void FVulkanSwapChain::Init(VkDevice logicalDevice,
-                            const VkSwapchainCreateInfoKHR& CreateInfo)
-{
-    uint32_t imageCount = 0;
-    vkGetSwapchainImagesKHR(logicalDevice, swapChain, &imageCount, nullptr);
-    Images.resize(imageCount);
-    vkGetSwapchainImagesKHR(logicalDevice, swapChain, &imageCount,
-                            Images.data());
-
-    ImageFormat = CreateInfo.imageFormat;
-    Extent = CreateInfo.imageExtent;
-
-    CreateImageViews(logicalDevice);
-}
-
-void FVulkanSwapChain::Deinit(VkDevice logicalDevice)
-{
     for (auto imageView : ImageViews) {
-        vkDestroyImageView(logicalDevice, imageView, nullptr);
+        vkDestroyImageView(_device, imageView, nullptr);
     }
     ImageViews.clear();
     Images.clear();
 
-    vkDestroySwapchainKHR(logicalDevice, swapChain, nullptr);
+    vkDestroySwapchainKHR(_device, swapChain, nullptr);
     swapChain = VK_NULL_HANDLE;
 }
 
-void FVulkanSwapChain::CreateImageViews(VkDevice logicalDevice)
+void FVulkanSwapChain::CreateImageViews()
 {
     ImageViews.resize(Images.size());
+    VkDevice _device = logicalDevice->GetDevice();
 
     for (size_t i = 0; i < Images.size(); i++) {
         VkImageViewCreateInfo createInfo = {};
@@ -65,8 +59,8 @@ void FVulkanSwapChain::CreateImageViews(VkDevice logicalDevice)
         createInfo.subresourceRange.baseArrayLayer = 0;
         createInfo.subresourceRange.layerCount = 1;
 
-        const VkResult CreateResult = vkCreateImageView(
-            logicalDevice, &createInfo, nullptr, &ImageViews[i]);
+        const VkResult CreateResult =
+            vkCreateImageView(_device, &createInfo, nullptr, &ImageViews[i]);
 
         if (CreateResult != VK_SUCCESS) {
             throw std::runtime_error("Failed to create image view");

@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "VulkanRHI/VulkanRHI.h"
+class FVulkanRHI;
 
 class GameEngine
 {
@@ -20,5 +20,5 @@ class GameEngine
     void cleanup();
 
   private:
-    std::shared_ptr<FVulkanRHI> RHI;
+    std::unique_ptr<FVulkanRHI> RHI;
 };

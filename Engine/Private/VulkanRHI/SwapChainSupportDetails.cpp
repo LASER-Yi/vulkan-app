@@ -8,6 +8,7 @@
 
 SwapChainSupportDetails::SwapChainSupportDetails(const VkPhysicalDevice device,
                                                  const VkSurfaceKHR surface)
+    : device(device), surface(surface)
 {
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &capabilities);
 

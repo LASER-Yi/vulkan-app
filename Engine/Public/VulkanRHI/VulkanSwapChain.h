@@ -1,20 +1,22 @@
 #pragma once
 
+#include <memory>
 #include <vulkan/vulkan.h>
 
 #include <vector>
 
+class FVulkanDevice;
+
 class FVulkanSwapChain
 {
   public:
-    FVulkanSwapChain(VkSwapchainKHR swapChain);
+    FVulkanSwapChain(VkSwapchainKHR swapChain, FVulkanDevice* device,
+                     VkFormat format, VkExtent2D extent);
     ~FVulkanSwapChain();
 
-    void Init(VkDevice logicalDevice,
-              const VkSwapchainCreateInfoKHR& CreateInfo);
-    void Deinit(VkDevice logicalDevice);
-
   protected:
+    FVulkanDevice* logicalDevice;
+
     VkSwapchainKHR swapChain;
     std::vector<VkImage> Images;
     std::vector<VkImageView> ImageViews;
@@ -22,5 +24,5 @@ class FVulkanSwapChain
     VkExtent2D Extent;
 
   private:
-    void CreateImageViews(VkDevice logicalDevice);
+    void CreateImageViews();
 };

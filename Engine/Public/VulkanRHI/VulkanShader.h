@@ -5,16 +5,15 @@
 #include <string>
 #include <vulkan/vulkan_core.h>
 
+class FVulkanDevice;
+
 class FVulkanShader
 {
   public:
-    FVulkanShader(VkShaderModule shader);
+    FVulkanShader(FVulkanDevice* device, VkShaderModule shader);
     ~FVulkanShader();
 
-    static std::shared_ptr<FVulkanShader> Create(VkDevice device,
-                                                 const std::string& filename);
-
   private:
-    VkDevice logicalDevice;
+    FVulkanDevice* device;
     VkShaderModule ShaderModule;
 };

@@ -14,17 +14,30 @@
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
+#include "VulkanRHI/QueueFamilyIndices.h"
 #include "VulkanRHI/SwapChainSupportDetails.h"
 #include "VulkanRHI/VulkanCommon.h"
+#include "VulkanRHI/VulkanDevice.h"
 #include "VulkanRHI/VulkanInstance.h"
 #include "VulkanRHI/VulkanSwapChain.h"
 
 const std::vector<const char*> requiredExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
-FVulkanGPUCreateParam::FVulkanGPUCreateParam() {}
+FVulkanGpu::FVulkanGpu(VkPhysicalDevice device, VkSurfaceKHR surface,
+                       const std::vector<const char*>& layers)
+    : device(device), surface(surface), layers(layers)
+{
+}
 
-QueueFamilyIndices FVulkanGPUCreateParam::GetQueueFamilies() const
+FVulkanGpu::~FVulkanGpu()
+{
+    logicalDevice.reset();
+
+    device = VK_NULL_HANDLE;
+}
+
+QueueFamilyIndices FVulkanGpu::GetQueueFamilies() const
 {
     QueueFamilyIndices indices;
 
@@ -57,7 +70,7 @@ QueueFamilyIndices FVulkanGPUCreateParam::GetQueueFamilies() const
     return indices;
 }
 
-const VkPhysicalDeviceProperties FVulkanGPUCreateParam::GetProperties() const
+const VkPhysicalDeviceProperties FVulkanGpu::GetProperties() const
 {
     VkPhysicalDeviceProperties properties;
     vkGetPhysicalDeviceProperties(device, &properties);
@@ -65,7 +78,7 @@ const VkPhysicalDeviceProperties FVulkanGPUCreateParam::GetProperties() const
     return std::move(properties);
 }
 
-const VkPhysicalDeviceFeatures FVulkanGPUCreateParam::GetFeatures() const
+const VkPhysicalDeviceFeatures FVulkanGpu::GetFeatures() const
 {
     VkPhysicalDeviceFeatures features;
     vkGetPhysicalDeviceFeatures(device, &features);
@@ -73,7 +86,7 @@ const VkPhysicalDeviceFeatures FVulkanGPUCreateParam::GetFeatures() const
     return std::move(features);
 }
 
-std::vector<VkExtensionProperties> FVulkanGPUCreateParam::GetExtensions() const
+std::vector<VkExtensionProperties> FVulkanGpu::GetExtensions() const
 {
     uint32_t extensionCount = 0;
     vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount,
@@ -86,7 +99,7 @@ std::vector<VkExtensionProperties> FVulkanGPUCreateParam::GetExtensions() const
     return std::move(extensions);
 }
 
-bool FVulkanGPUCreateParam::IsValid() const
+bool FVulkanGpu::IsValid() const
 {
     const auto extensions = GetExtensions();
 
@@ -104,7 +117,7 @@ bool FVulkanGPUCreateParam::IsValid() const
     return IsExtensionAvailable && indices.isValid();
 }
 
-uint32_t FVulkanGPUCreateParam::GetScore() const
+uint32_t FVulkanGpu::GetScore() const
 {
     const VkPhysicalDeviceProperties properties = GetProperties();
     const VkPhysicalDeviceFeatures features = GetFeatures();
@@ -125,36 +138,10 @@ uint32_t FVulkanGPUCreateParam::GetScore() const
     return score;
 }
 
-// BEGIN: Vulkan GPU
-FVulkanGPU::FVulkanGPU(const FVulkanGPUCreateParam& Param) { Init(Param); }
-
-FVulkanGPU::~FVulkanGPU()
+void FVulkanGpu::InitLogicalDevice()
 {
-    swapChain->Deinit(logicalDevice);
-    swapChain.reset();
-
-    vkDestroyDevice(logicalDevice, nullptr);
-    device = VK_NULL_HANDLE;
-}
-
-void FVulkanGPU::Init(const FVulkanGPUCreateParam& Param)
-{
-    assert(Param.IsValid());
-
-    device = Param.device;
-    indices = Param.GetQueueFamilies();
-
-    CreateLogicalDevice(Param);
-    CreateSwapChain(Param);
-
-    CreateDeviceQueue();
-}
-
-void FVulkanGPU::CreateLogicalDevice(const FVulkanGPUCreateParam& Param)
-{
-    assert(Param.IsValid());
-
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+    const QueueFamilyIndices indices = GetQueueFamilies();
 
     const std::set<uint32_t> uniqueQueueFamilies = {
         indices.graphicsFamily.value(), indices.presentFamily.value()};
@@ -183,8 +170,8 @@ void FVulkanGPU::CreateLogicalDevice(const FVulkanGPUCreateParam& Param)
     createInfo.pEnabledFeatures = &deviceFeatures;
 
     if (GE_VALIDATION_LAYERS) {
-        createInfo.enabledLayerCount = Param.layers.size();
-        createInfo.ppEnabledLayerNames = Param.layers.data();
+        createInfo.enabledLayerCount = layers.size();
+        createInfo.ppEnabledLayerNames = layers.data();
     } else {
         createInfo.enabledLayerCount = 0;
     }
@@ -195,7 +182,7 @@ void FVulkanGPU::CreateLogicalDevice(const FVulkanGPUCreateParam& Param)
     extensionNames.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
 #if PLATFORM_APPLE
-    const auto extensions = Param.GetExtensions();
+    const auto extensions = GetExtensions();
 
     if (std::find_if(extensions.begin(), extensions.end(),
                      [](const VkExtensionProperties& properties) {
@@ -209,78 +196,16 @@ void FVulkanGPU::CreateLogicalDevice(const FVulkanGPUCreateParam& Param)
     createInfo.enabledExtensionCount = extensionNames.size();
     createInfo.ppEnabledExtensionNames = extensionNames.data();
 
+    VkDevice ld;
     const VkResult CreateResult =
-        vkCreateDevice(device, &createInfo, nullptr, &logicalDevice);
+        vkCreateDevice(device, &createInfo, nullptr, &ld);
 
     if (CreateResult != VK_SUCCESS) {
         throw std::runtime_error("Failed to create logical device!");
     }
+
+    logicalDevice = std::make_unique<FVulkanDevice>(ld, indices);
+    logicalDevice->InitSwapChain(SwapChainSupportDetails(device, surface));
 }
 
-void FVulkanGPU::CreateSwapChain(const FVulkanGPUCreateParam& Param)
-{
-    assert(Param.IsValid());
-    VkSurfaceKHR surface = Param.surface;
-
-    const SwapChainSupportDetails details(device, surface);
-
-    assert(details.IsValid());
-
-    const VkSurfaceFormatKHR surfaceFormat = details.GetRequiredSurfaceFormat();
-
-    VkSwapchainCreateInfoKHR createInfo = {};
-    ZeroVulkanStruct(createInfo, VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR);
-    createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    createInfo.surface = surface;
-    createInfo.minImageCount = details.GetImageCount();
-
-    createInfo.presentMode = details.GetRequiredPresentMode();
-    createInfo.clipped = VK_TRUE;
-
-    createInfo.imageFormat = surfaceFormat.format;
-    createInfo.imageColorSpace = surfaceFormat.colorSpace;
-
-    // TODO: Better struct
-    createInfo.imageExtent = details.GetRequiredExtent(nullptr);
-
-    createInfo.imageArrayLayers = 1;
-    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-    const uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(),
-                                           indices.presentFamily.value()};
-
-    if (indices.graphicsFamily != indices.presentFamily) {
-        createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-        createInfo.queueFamilyIndexCount = 2;
-        createInfo.pQueueFamilyIndices = queueFamilyIndices;
-    } else {
-        createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    }
-
-    createInfo.preTransform = details.capabilities.currentTransform;
-    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-
-    createInfo.oldSwapchain = VK_NULL_HANDLE;
-
-    VkSwapchainKHR sc;
-
-    const VkResult CreateResult =
-        vkCreateSwapchainKHR(logicalDevice, &createInfo, nullptr, &sc);
-
-    if (CreateResult != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create swap chain");
-    }
-
-    swapChain = std::make_shared<FVulkanSwapChain>(sc);
-    swapChain->Init(logicalDevice, createInfo);
-}
-
-void FVulkanGPU::CreateDeviceQueue()
-{
-    assert(logicalDevice != VK_NULL_HANDLE);
-
-    vkGetDeviceQueue(logicalDevice, indices.graphicsFamily.value(), 0,
-                     &graphicsQueue);
-    vkGetDeviceQueue(logicalDevice, indices.presentFamily.value(), 0,
-                     &presentQueue);
-}
+VkSurfaceKHR FVulkanGpu::GetSurface() const { return surface; }

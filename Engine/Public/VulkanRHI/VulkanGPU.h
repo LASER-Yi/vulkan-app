@@ -6,18 +6,21 @@
 #include <vulkan/vulkan_core.h>
 
 #include "VulkanRHI/QueueFamilyIndices.h"
+#include "VulkanRHI/VulkanDevice.h"
 #include "VulkanRHI/VulkanShader.h"
 
 class FVulkanInstance;
-class FVulkanSwapChain;
 
-struct FVulkanGPUCreateParam {
-    VkPhysicalDevice device;
-    VkSurfaceKHR surface;
+// Physical Device Wrapper
+class FVulkanGpu
+{
+  public:
+    FVulkanGpu(VkPhysicalDevice device, VkSurfaceKHR surface,
+               const std::vector<const char*>& layers);
+    ~FVulkanGpu();
 
-    std::vector<const char*> layers;
+    void InitLogicalDevice();
 
-    FVulkanGPUCreateParam();
     QueueFamilyIndices GetQueueFamilies() const;
     const VkPhysicalDeviceProperties GetProperties() const;
     const VkPhysicalDeviceFeatures GetFeatures() const;
@@ -26,28 +29,16 @@ struct FVulkanGPUCreateParam {
 
     bool IsValid() const;
     uint32_t GetScore() const;
-};
 
-// Physical Device Wrapper
-class FVulkanGPU
-{
-  public:
-    FVulkanGPU(const FVulkanGPUCreateParam& Param);
-    ~FVulkanGPU();
+    VkSurfaceKHR GetSurface() const;
 
   protected:
     VkPhysicalDevice device;
-    QueueFamilyIndices indices;
+    VkSurfaceKHR surface;
 
-    VkQueue graphicsQueue;
-    VkQueue presentQueue;
-    VkDevice logicalDevice;
+    std::vector<const char*> layers;
 
-    std::shared_ptr<FVulkanSwapChain> swapChain;
+    std::unique_ptr<FVulkanDevice> logicalDevice;
 
   private:
-    void Init(const FVulkanGPUCreateParam& Param);
-    void CreateLogicalDevice(const FVulkanGPUCreateParam& Param);
-    void CreateSwapChain(const FVulkanGPUCreateParam& Param);
-    void CreateDeviceQueue();
 };

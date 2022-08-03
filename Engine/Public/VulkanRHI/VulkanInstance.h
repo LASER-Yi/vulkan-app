@@ -5,28 +5,27 @@
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
 
-class FVulkanGPU;
-class FVulkanGPUCreateParam;
+#include "GLFW/glfw3.h"
+#include "VulkanRHI/VulkanGPU.h"
+
 class FVulkanRHI;
 class GLFWwindow;
 
 class FVulkanInstance
 {
   public:
-    FVulkanInstance();
+    FVulkanInstance(GLFWwindow* window);
     ~FVulkanInstance();
 
     static std::vector<const char*> validationLayers;
 
-    void Init(GLFWwindow* window);
-
   public:
-    std::vector<FVulkanGPUCreateParam> GetGPUs() const;
+    std::vector<std::unique_ptr<FVulkanGpu>> GetGPUs() const;
 
   protected:
     VkInstance instance;
     VkSurfaceKHR surface;
-    std::shared_ptr<FVulkanGPU> device;
+    std::unique_ptr<FVulkanGpu> device;
 
     std::vector<const char*> enabledLayers;
     std::vector<const char*> enabledExtensions;

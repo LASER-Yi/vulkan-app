@@ -1,31 +1,28 @@
 #include "VulkanRHI/VulkanRHI.h"
+
 #include <iostream>
-#include <memory>
 #include <utility>
-#include <vector>
 
 #include "GLFW/glfw3.h"
-#include "VulkanRHI/VulkanInstance.h"
 
 constexpr uint32_t WIDTH = 800;
 constexpr uint32_t HEIGHT = 600;
 
 FVulkanRHI::FVulkanRHI() {}
 
-FVulkanRHI::~FVulkanRHI()
+void FVulkanRHI::Init()
+{
+    CreateWindow();
+
+    Instance = std::make_unique<FVulkanInstance>(window);
+}
+
+void FVulkanRHI::Destroy()
 {
     Instance.reset();
 
     glfwDestroyWindow(window);
     window = nullptr;
-}
-
-void FVulkanRHI::Init()
-{
-    CreateWindow();
-
-    Instance = std::make_shared<FVulkanInstance>();
-    Instance->Init(window);
 }
 
 void FVulkanRHI::Render()
@@ -35,10 +32,7 @@ void FVulkanRHI::Render()
     }
 }
 
-std::shared_ptr<FVulkanInstance> FVulkanRHI::GetInstance() const
-{
-    return Instance;
-}
+FVulkanInstance* FVulkanRHI::GetInstance() const { return Instance.get(); }
 
 std::vector<VkExtensionProperties> FVulkanRHI::GetAvailableExtensions()
 {

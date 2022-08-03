@@ -9,5 +9,3 @@
 #endif
 
 #define GE_VALIDATION_LAYERS BUILD_DEBUG
-
-#define PLATFORM_MACOS 1

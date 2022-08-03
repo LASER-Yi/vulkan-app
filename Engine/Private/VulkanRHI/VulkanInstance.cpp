@@ -15,15 +15,23 @@
 std::vector<const char*> FVulkanInstance::validationLayers = {
     "VK_LAYER_KHRONOS_validation"};
 
-FVulkanInstance::FVulkanInstance() {}
+FVulkanInstance::FVulkanInstance(GLFWwindow* window)
+{
+    assert(window != nullptr);
+
+    CreateInstance();
+    CreateSurface(window);
+    SelectGPU();
+}
 
 FVulkanInstance::~FVulkanInstance()
 {
-    device.reset();
+    device = nullptr;
+
     vkDestroyInstance(instance, nullptr);
 }
 
-std::vector<FVulkanGPUCreateParam> FVulkanInstance::GetGPUs() const
+std::vector<std::unique_ptr<FVulkanGpu>> FVulkanInstance::GetGPUs() const
 {
     assert(instance != VK_NULL_HANDLE);
     assert(surface != VK_NULL_HANDLE);
@@ -38,15 +46,11 @@ std::vector<FVulkanGPUCreateParam> FVulkanInstance::GetGPUs() const
     std::vector<VkPhysicalDevice> devices(deviceCount);
     vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
 
-    std::vector<FVulkanGPUCreateParam> gpus;
+    std::vector<std::unique_ptr<FVulkanGpu>> gpus;
     gpus.reserve(devices.size());
     for (const auto& device : devices) {
-        FVulkanGPUCreateParam param;
-        param.device = device;
-        param.surface = surface;
-        param.layers = enabledLayers;
-
-        gpus.emplace_back(param);
+        gpus.emplace_back(
+            std::make_unique<FVulkanGpu>(device, surface, enabledLayers));
     }
 
     return std::move(gpus);
@@ -80,24 +84,15 @@ bool FVulkanInstance::SupportValidationLayer() const
     return true;
 }
 
-void FVulkanInstance::Init(GLFWwindow* window)
-{
-    assert(window != nullptr);
-
-    CreateInstance();
-    CreateSurface(window);
-    SelectGPU();
-}
-
 void FVulkanInstance::SelectGPU()
 {
     assert(instance != VK_NULL_HANDLE);
-    const auto gpus = GetGPUs();
+    auto gpus = GetGPUs();
 
     // Simplest solution
-    for (const FVulkanGPUCreateParam& gpu : gpus) {
-        if (gpu.IsValid()) {
-            device = std::make_shared<FVulkanGPU>(gpu);
+    for (std::unique_ptr<FVulkanGpu>& gpu : gpus) {
+        if (gpu->IsValid()) {
+            device = std::move(gpu);
             break;
         }
     }
@@ -105,6 +100,8 @@ void FVulkanInstance::SelectGPU()
     if (device == VK_NULL_HANDLE) {
         throw std::runtime_error("Failed to find a suitable GPU!");
     }
+
+    device->InitLogicalDevice();
 }
 
 void FVulkanInstance::CreateInstance()

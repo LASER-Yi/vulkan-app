@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "Definition.h"
+#include "VulkanRHI/VulkanRHI.h"
 
 GameEngine::GameEngine() {}
 
@@ -17,7 +18,7 @@ void GameEngine::run()
 
 void GameEngine::init()
 {
-    RHI = std::make_shared<FVulkanRHI>();
+    RHI = std::make_unique<FVulkanRHI>();
 
     RHI->Init();
 }

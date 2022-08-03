@@ -4,25 +4,27 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 
-class FVulkanInstance;
+#include "VulkanInstance.h"
+
 class GLFWwindow;
 
 class FVulkanRHI
 {
   public:
     FVulkanRHI();
-    ~FVulkanRHI();
 
     void Init();
+    void Destroy();
+
     void Render();
 
-    std::shared_ptr<FVulkanInstance> GetInstance() const;
+    FVulkanInstance* GetInstance() const;
 
     static std::vector<VkExtensionProperties> GetAvailableExtensions();
     static std::vector<VkLayerProperties> GetAvailableLayers();
 
   protected:
-    std::shared_ptr<FVulkanInstance> Instance;
+    std::unique_ptr<FVulkanInstance> Instance;
     GLFWwindow* window;
 
   private:

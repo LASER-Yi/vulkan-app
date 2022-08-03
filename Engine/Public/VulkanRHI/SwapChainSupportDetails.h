@@ -12,9 +12,14 @@ struct SwapChainSupportDetails {
     std::vector<VkSurfaceFormatKHR> formats;
     std::vector<VkPresentModeKHR> presentModes;
 
+    VkPhysicalDevice device;
+    VkSurfaceKHR surface;
+
   public:
     SwapChainSupportDetails(const VkPhysicalDevice device,
                             const VkSurfaceKHR surface);
+
+    VkSurfaceKHR GetSurface() const { return surface; }
 
     VkSurfaceFormatKHR GetRequiredSurfaceFormat() const;
     VkPresentModeKHR GetRequiredPresentMode() const;
