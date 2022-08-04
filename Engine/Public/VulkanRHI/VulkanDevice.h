@@ -3,7 +3,9 @@
 #include "VulkanRHI/QueueFamilyIndices.h"
 #include "VulkanRHI/SwapChainSupportDetails.h"
 #include "vulkan/vulkan_core.h"
+
 #include <memory>
+#include <string>
 #include <vector>
 
 class FVulkanShader;
@@ -15,7 +17,8 @@ class FVulkanDevice
     FVulkanDevice(VkDevice device, const QueueFamilyIndices& indices);
     ~FVulkanDevice();
 
-    std::shared_ptr<FVulkanShader> CreateShader(const std::string& filename);
+    std::shared_ptr<FVulkanShader> CreateShader(const std::string& filename,
+                                                VkShaderStageFlagBits stage);
 
     void InitSwapChain(const SwapChainSupportDetails& details);
 

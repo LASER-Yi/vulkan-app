@@ -7,7 +7,8 @@
 #include "VulkanRHI/VulkanSwapChain.h"
 
 #include <cassert>
-#include <memory>
+#include <stdexcept>
+#include <vulkan/vulkan_core.h>
 
 FVulkanDevice::FVulkanDevice(VkDevice device, const QueueFamilyIndices& indices)
     : device(device), indices(indices)
@@ -26,26 +27,12 @@ FVulkanDevice::~FVulkanDevice()
 }
 
 std::shared_ptr<FVulkanShader>
-FVulkanDevice::CreateShader(const std::string& filename)
+FVulkanDevice::CreateShader(const std::string& filename,
+                            VkShaderStageFlagBits stage)
 {
     const FileBlob blob = FileManager::ReadFile(filename);
 
-    VkShaderModuleCreateInfo createInfo = {};
-    ZeroVulkanStruct(createInfo, VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO);
-    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    createInfo.codeSize = blob.GetFileSize();
-    createInfo.pCode = blob.GetData();
-
-    VkShaderModule shader;
-    const VkResult CreateResult =
-        vkCreateShaderModule(device, &createInfo, nullptr, &shader);
-
-    if (CreateResult != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create shader module");
-    }
-
-    std::shared_ptr<FVulkanShader> _shader =
-        std::make_shared<FVulkanShader>(this, shader);
+    auto _shader = std::make_shared<FVulkanShader>(this, blob, stage, "main");
 
     shaders.push_back(_shader);
 

@@ -32,6 +32,8 @@ class FVulkanGpu
 
     VkSurfaceKHR GetSurface() const;
 
+    FVulkanDevice* GetLogicalDevice() const;
+
   protected:
     VkPhysicalDevice device;
     VkSurfaceKHR surface;

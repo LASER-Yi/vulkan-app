@@ -29,4 +29,5 @@ class FVulkanRHI
 
   private:
     void CreateWindow();
+    void CreatePipeline();
 };

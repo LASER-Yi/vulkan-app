@@ -22,6 +22,8 @@ class FVulkanInstance
   public:
     std::vector<std::unique_ptr<FVulkanGpu>> GetGPUs() const;
 
+    FVulkanGpu* GetPhysicalDevice() const { return device.get(); }
+
   protected:
     VkInstance instance;
     VkSurfaceKHR surface;

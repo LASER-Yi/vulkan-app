@@ -1,15 +1,30 @@
 #include "VulkanRHI/VulkanShader.h"
+
+#include "Core/FileManager.h"
 #include "VulkanRHI/VulkanCommon.h"
 #include "VulkanRHI/VulkanDevice.h"
 #include <memory>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
-FVulkanShader::FVulkanShader(FVulkanDevice* device, VkShaderModule shader,
+FVulkanShader::FVulkanShader(FVulkanDevice* device, const FileBlob& blob,
                              VkShaderStageFlagBits stage,
                              const std::string& entryPoint)
-    : device(device), ShaderModule(shader), stage(stage), entryPoint(entryPoint)
+    : device(device), stage(stage), entryPoint(entryPoint)
 {
+    VkShaderModuleCreateInfo createInfo = {};
+    ZeroVulkanStruct(createInfo, VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO);
+    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    createInfo.codeSize = blob.GetFileSize();
+    createInfo.pCode = blob.GetData();
+
+    VkShaderModule shader;
+    const VkResult CreateResult = vkCreateShaderModule(
+        device->GetDevice(), &createInfo, nullptr, &ShaderModule);
+
+    if (CreateResult != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create shader module");
+    }
 }
 
 FVulkanShader::~FVulkanShader()
@@ -21,7 +36,7 @@ FVulkanShader::~FVulkanShader()
     device = VK_NULL_HANDLE;
 }
 
-void FVulkanShader::CreatePipelineStage() const
+VkPipelineShaderStageCreateInfo FVulkanShader::CreatePipelineStage() const
 {
     VkDevice _device = device->GetDevice();
 
@@ -32,4 +47,6 @@ void FVulkanShader::CreatePipelineStage() const
     stageInfo.stage = stage;
     stageInfo.module = ShaderModule;
     stageInfo.pName = entryPoint.c_str();
+
+    return std::move(stageInfo);
 }

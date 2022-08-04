@@ -1,9 +1,13 @@
 #include "VulkanRHI/VulkanRHI.h"
 
 #include <iostream>
+#include <memory>
 #include <utility>
+#include <vulkan/vulkan_core.h>
 
 #include "GLFW/glfw3.h"
+#include "VulkanRHI/VulkanDevice.h"
+#include "VulkanRHI/VulkanShader.h"
 
 constexpr uint32_t WIDTH = 800;
 constexpr uint32_t HEIGHT = 600;
@@ -15,6 +19,8 @@ void FVulkanRHI::Init()
     CreateWindow();
 
     Instance = std::make_unique<FVulkanInstance>(window);
+
+    CreatePipeline();
 }
 
 void FVulkanRHI::Destroy()
@@ -63,4 +69,17 @@ void FVulkanRHI::CreateWindow()
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan window", nullptr, nullptr);
+}
+
+void FVulkanRHI::CreatePipeline()
+{
+    FVulkanDevice* device = Instance->GetPhysicalDevice()->GetLogicalDevice();
+
+    auto VertShader = device->CreateShader("shaders/triangle.vert.spv",
+                                           VK_SHADER_STAGE_VERTEX_BIT);
+    auto FragShader = device->CreateShader("shaders/triangle.frag.spv",
+                                           VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    VkPipelineShaderStageCreateInfo shaderStages[] = {
+        VertShader->CreatePipelineStage(), FragShader->CreatePipelineStage()};
 }

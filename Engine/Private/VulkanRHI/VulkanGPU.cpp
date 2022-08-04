@@ -209,3 +209,10 @@ void FVulkanGpu::InitLogicalDevice()
 }
 
 VkSurfaceKHR FVulkanGpu::GetSurface() const { return surface; }
+
+FVulkanDevice* FVulkanGpu::GetLogicalDevice() const
+{
+    assert(logicalDevice != nullptr);
+
+    return logicalDevice.get();
+}

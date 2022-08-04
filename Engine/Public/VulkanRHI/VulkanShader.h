@@ -10,11 +10,11 @@ class FVulkanDevice;
 class FVulkanShader
 {
   public:
-    FVulkanShader(FVulkanDevice* device, VkShaderModule shader,
+    FVulkanShader(FVulkanDevice* device, const FileBlob& blob,
                   VkShaderStageFlagBits stage, const std::string& entryPoint);
     ~FVulkanShader();
 
-    void CreatePipelineStage() const;
+    VkPipelineShaderStageCreateInfo CreatePipelineStage() const;
 
   private:
     FVulkanDevice* device;
