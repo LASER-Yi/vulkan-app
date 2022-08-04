@@ -4,6 +4,7 @@
 #include <vulkan/vulkan.h>
 
 #include <vector>
+#include <vulkan/vulkan_core.h>
 
 class FVulkanDevice;
 
@@ -13,6 +14,9 @@ class FVulkanSwapChain
     FVulkanSwapChain(VkSwapchainKHR swapChain, FVulkanDevice* device,
                      VkFormat format, VkExtent2D extent);
     ~FVulkanSwapChain();
+
+    VkFormat GetFormat() const { return ImageFormat; }
+    VkExtent2D GetExtent() const { return Extent; }
 
   protected:
     FVulkanDevice* logicalDevice;

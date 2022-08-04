@@ -22,7 +22,9 @@ class FVulkanDevice
 
     void InitSwapChain(const SwapChainSupportDetails& details);
 
-    VkDevice GetDevice() const;
+    VkDevice GetDevice() const { return device; }
+
+    FVulkanSwapChain* GetSwapChain() const { return swapChain.get(); }
 
   protected:
     VkDevice device;

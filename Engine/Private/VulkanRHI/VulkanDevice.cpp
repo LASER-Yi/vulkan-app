@@ -39,8 +39,6 @@ FVulkanDevice::CreateShader(const std::string& filename,
     return _shader;
 }
 
-VkDevice FVulkanDevice::GetDevice() const { return device; }
-
 void FVulkanDevice::InitSwapChain(const SwapChainSupportDetails& details)
 {
     assert(device != VK_NULL_HANDLE);
