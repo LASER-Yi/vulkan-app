@@ -8,6 +8,8 @@
 #include "VulkanRHI/VulkanSwapChain.h"
 
 #include <cassert>
+#include <cstddef>
+#include <limits>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
@@ -20,19 +22,27 @@ FVulkanDevice::FVulkanDevice(VkDevice device, FVulkanGpu* physicalDevice)
     InitRenderPass();
     InitPipeline();
 
+    InitCommandPool();
+
     swapChain->CreateFrameBuffers();
+
+    InitFences();
 }
 
 FVulkanDevice::~FVulkanDevice()
 {
+    vkDestroyFence(device, inRenderFence, nullptr);
+
+    vkDestroyCommandPool(device, commandPool, nullptr);
+
     vkDestroyPipeline(device, graphicsPipeline, nullptr);
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+
+    swapChain.reset();
 
     vkDestroyRenderPass(device, renderPass, nullptr);
 
     shaders.clear();
-
-    swapChain.reset();
 
     vkDestroyDevice(device, nullptr);
     device = VK_NULL_HANDLE;
@@ -49,6 +59,55 @@ FVulkanDevice::CreateShader(const std::string& filename,
     shaders.push_back(_shader);
 
     return _shader;
+}
+
+void FVulkanDevice::Submit(VkCommandBuffer commandBuffer, uint32_t imageIndex)
+{
+    VkCommandBufferBeginInfo beginInfo = {};
+    ZeroVulkanStruct(beginInfo, VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO);
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = 0;
+    beginInfo.pInheritanceInfo = nullptr;
+
+    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+        throw std::runtime_error("failed to begin recording command buffer!");
+    }
+
+    VkRenderPassBeginInfo renderPassInfo = {};
+    ZeroVulkanStruct(renderPassInfo, VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO);
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassInfo.renderPass = renderPass;
+    renderPassInfo.framebuffer = swapChain->GetFrameBuffer(imageIndex);
+    renderPassInfo.renderArea.offset = {0, 0};
+    renderPassInfo.renderArea.extent = swapChain->GetExtent();
+
+    VkClearValue clearColor = {0.0f, 0.0f, 0.0f, 1.0f};
+    renderPassInfo.clearValueCount = 1;
+    renderPassInfo.pClearValues = &clearColor;
+
+    // VK_SUBPASS_CONTENTS_INLINE render pass will be embedded in the primary
+    // command buffer
+
+    // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS render pass will be
+    // executed from secondary command buffer
+
+    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo,
+                         VK_SUBPASS_CONTENTS_INLINE);
+
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                      graphicsPipeline);
+
+    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+    // DRAW!
+    vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+
+    vkCmdEndRenderPass(commandBuffer);
+
+    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+        throw std::runtime_error("failed to record command buffer!");
+    }
 }
 
 void FVulkanDevice::InitSwapChain()
@@ -161,7 +220,6 @@ void FVulkanDevice::InitPipeline()
     FVulkanSwapChain* swapChain = GetSwapChain();
     const VkExtent2D extent = swapChain->GetExtent();
 
-    VkViewport viewport = {};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
     viewport.width = static_cast<float>(extent.width);
@@ -169,7 +227,6 @@ void FVulkanDevice::InitPipeline()
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
-    VkRect2D scissor = {};
     scissor.offset = {0, 0};
     scissor.extent = extent;
 
@@ -333,10 +390,93 @@ void FVulkanDevice::InitRenderPass()
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpass;
 
+    // Subpass dependency
+    VkSubpassDependency dependency = {};
+    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass = 0;
+
+    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcAccessMask = 0;
+
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    renderPassInfo.dependencyCount = 1;
+    renderPassInfo.pDependencies = &dependency;
+
     const VkResult CreateRenderPassResult =
         vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass);
 
     if (CreateRenderPassResult != VK_SUCCESS) {
         throw std::runtime_error("Failed to create render pass");
+    }
+}
+
+void FVulkanDevice::InitCommandPool()
+{
+    const auto indices = physicalDevice->GetQueueFamilies();
+
+    VkCommandPoolCreateInfo commandPoolInfo = {};
+    ZeroVulkanStruct(commandPoolInfo,
+                     VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO);
+    commandPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    commandPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    commandPoolInfo.queueFamilyIndex = indices.graphicsFamily.value();
+
+    const VkResult CreateCommandPoolResult =
+        vkCreateCommandPool(device, &commandPoolInfo, nullptr, &commandPool);
+
+    if (CreateCommandPoolResult != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create command pool");
+    }
+}
+
+VkCommandBuffer FVulkanDevice::CreateCommandBuffer()
+{
+    VkCommandBufferAllocateInfo allocInfo = {};
+    ZeroVulkanStruct(allocInfo, VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO);
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandPool = commandPool;
+
+    // VK_COMMAND_BUFFER_LEVEL_PRIMARY means that the command buffer can be
+    // submitted directly
+
+    // VK_COMMAND_BUFFER_LEVEL_SECONDARY means that the
+    // command buffer can not by submitted directly, but can be called from
+    // primary command buffers
+
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandBufferCount = 1;
+
+    VkCommandBuffer commandBuffer;
+    const VkResult AllocateCommandBufferResult =
+        vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
+
+    if (AllocateCommandBufferResult != VK_SUCCESS) {
+        throw std::runtime_error("Failed to allocate command buffer");
+    }
+
+    return commandBuffer;
+}
+
+void FVulkanDevice::WaitRenderFinished()
+{
+    vkWaitForFences(device, 1, &inRenderFence, VK_TRUE,
+                    std::numeric_limits<uint64_t>::max());
+    vkResetFences(device, 1, &inRenderFence);
+}
+
+void FVulkanDevice::InitFences()
+{
+    VkFenceCreateInfo fenceInfo = {};
+    ZeroVulkanStruct(fenceInfo, VK_STRUCTURE_TYPE_FENCE_CREATE_INFO);
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+
+    // VK_FENCE_CREATE_SIGNALED_BIT means that the fence is initially signaled
+    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+    if (vkCreateFence(device, &fenceInfo, nullptr, &inRenderFence) !=
+        VK_SUCCESS) {
+        throw std::runtime_error("Failed to create fence");
     }
 }

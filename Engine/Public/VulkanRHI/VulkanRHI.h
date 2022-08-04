@@ -23,10 +23,15 @@ class FVulkanRHI
     static std::vector<VkExtensionProperties> GetAvailableExtensions();
     static std::vector<VkLayerProperties> GetAvailableLayers();
 
-  protected:
+  private:
     std::unique_ptr<FVulkanInstance> Instance;
     GLFWwindow* window;
 
+    // TODO: refactor this
+    VkCommandBuffer commandBuffer;
+
   private:
     void CreateWindow();
+
+    void Draw();
 };

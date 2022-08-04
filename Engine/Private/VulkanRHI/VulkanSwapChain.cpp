@@ -19,11 +19,15 @@ FVulkanSwapChain::FVulkanSwapChain(VkSwapchainKHR swapChain,
     vkGetSwapchainImagesKHR(_device, swapChain, &imageCount, Images.data());
 
     CreateImageViews();
+    CreateSyncObjects();
 }
 
 FVulkanSwapChain::~FVulkanSwapChain()
 {
     VkDevice _device = logicalDevice->GetDevice();
+
+    vkDestroySemaphore(_device, imageAvailableSemaphore, nullptr);
+    vkDestroySemaphore(_device, renderFinishedSemaphore, nullptr);
 
     for (auto framebuffer : frameBuffers) {
         vkDestroyFramebuffer(_device, framebuffer, nullptr);
@@ -100,4 +104,36 @@ void FVulkanSwapChain::CreateFrameBuffers()
             throw std::runtime_error("Failed to create frame buffer");
         }
     }
+}
+
+VkFramebuffer FVulkanSwapChain::GetFrameBuffer(uint32_t index) const
+{
+    assert(index < frameBuffers.size());
+    return frameBuffers[index];
+}
+
+void FVulkanSwapChain::CreateSyncObjects()
+{
+    VkSemaphoreCreateInfo semaphoreInfo = {};
+    ZeroVulkanStruct(semaphoreInfo, VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO);
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    VkDevice _device = logicalDevice->GetDevice();
+    if (vkCreateSemaphore(_device, &semaphoreInfo, nullptr,
+                          &imageAvailableSemaphore) != VK_SUCCESS ||
+        vkCreateSemaphore(_device, &semaphoreInfo, nullptr,
+                          &renderFinishedSemaphore) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create semaphores!");
+    }
+}
+
+uint32_t FVulkanSwapChain::GetNextImageIndex() const
+{
+    uint32_t nextImageIndex = 0;
+    vkAcquireNextImageKHR(logicalDevice->GetDevice(), swapChain,
+                          std::numeric_limits<uint64_t>::max(),
+                          imageAvailableSemaphore, VK_NULL_HANDLE,
+                          &nextImageIndex);
+
+    return nextImageIndex;
 }
