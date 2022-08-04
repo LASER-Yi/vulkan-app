@@ -25,4 +25,4 @@ void GameEngine::init()
 
 void GameEngine::tick() { RHI->Render(); }
 
-void GameEngine::cleanup() {}
+void GameEngine::cleanup() { RHI->Destroy(); }
