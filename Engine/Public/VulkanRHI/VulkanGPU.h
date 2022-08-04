@@ -6,6 +6,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include "VulkanRHI/QueueFamilyIndices.h"
+#include "VulkanRHI/SwapChainSupportDetails.h"
 #include "VulkanRHI/VulkanDevice.h"
 #include "VulkanRHI/VulkanShader.h"
 
@@ -26,6 +27,8 @@ class FVulkanGpu
     const VkPhysicalDeviceFeatures GetFeatures() const;
 
     std::vector<VkExtensionProperties> GetExtensions() const;
+
+    SwapChainSupportDetails GetSwapChainSupportDetails() const;
 
     bool IsValid() const;
     uint32_t GetScore() const;

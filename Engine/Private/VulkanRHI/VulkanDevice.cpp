@@ -3,6 +3,7 @@
 #include "Core/FileManager.h"
 #include "VulkanRHI/QueueFamilyIndices.h"
 #include "VulkanRHI/VulkanCommon.h"
+#include "VulkanRHI/VulkanGPU.h"
 #include "VulkanRHI/VulkanShader.h"
 #include "VulkanRHI/VulkanSwapChain.h"
 
@@ -10,10 +11,16 @@
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
-FVulkanDevice::FVulkanDevice(VkDevice device, const QueueFamilyIndices& indices)
-    : device(device), indices(indices)
+FVulkanDevice::FVulkanDevice(VkDevice device, FVulkanGpu* physicalDevice)
+    : device(device), physicalDevice(physicalDevice)
 {
+    InitSwapChain();
     InitDeviceQueue();
+
+    InitRenderPass();
+    InitPipeline();
+
+    swapChain->CreateFrameBuffers();
 }
 
 FVulkanDevice::~FVulkanDevice()
@@ -44,9 +51,11 @@ FVulkanDevice::CreateShader(const std::string& filename,
     return _shader;
 }
 
-void FVulkanDevice::InitSwapChain(const SwapChainSupportDetails& details)
+void FVulkanDevice::InitSwapChain()
 {
     assert(device != VK_NULL_HANDLE);
+
+    const auto details = physicalDevice->GetSwapChainSupportDetails();
     assert(details.IsValid());
 
     const VkSurfaceFormatKHR surfaceFormat = details.GetRequiredSurfaceFormat();
@@ -68,6 +77,8 @@ void FVulkanDevice::InitSwapChain(const SwapChainSupportDetails& details)
 
     createInfo.imageArrayLayers = 1;
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    const auto indices = physicalDevice->GetQueueFamilies();
 
     const uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(),
                                            indices.presentFamily.value()};
@@ -96,17 +107,13 @@ void FVulkanDevice::InitSwapChain(const SwapChainSupportDetails& details)
 
     swapChain = std::make_unique<FVulkanSwapChain>(
         sc, this, createInfo.imageFormat, createInfo.imageExtent);
-
-    // TODO: Move to the right location
-    InitRenderPass();
-    InitPipeline();
-
-    swapChain->CreateFrameBuffers();
 }
 
 void FVulkanDevice::InitDeviceQueue()
 {
     assert(device != VK_NULL_HANDLE);
+
+    const auto indices = physicalDevice->GetQueueFamilies();
 
     vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
     vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);

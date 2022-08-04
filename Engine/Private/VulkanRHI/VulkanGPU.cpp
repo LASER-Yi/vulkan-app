@@ -204,8 +204,7 @@ void FVulkanGpu::InitLogicalDevice()
         throw std::runtime_error("Failed to create logical device!");
     }
 
-    logicalDevice = std::make_unique<FVulkanDevice>(ld, indices);
-    logicalDevice->InitSwapChain(SwapChainSupportDetails(device, surface));
+    logicalDevice = std::make_unique<FVulkanDevice>(ld, this);
 }
 
 VkSurfaceKHR FVulkanGpu::GetSurface() const { return surface; }
@@ -215,4 +214,9 @@ FVulkanDevice* FVulkanGpu::GetLogicalDevice() const
     assert(logicalDevice != nullptr);
 
     return logicalDevice.get();
+}
+
+SwapChainSupportDetails FVulkanGpu::GetSwapChainSupportDetails() const
+{
+    return SwapChainSupportDetails(device, surface);
 }
