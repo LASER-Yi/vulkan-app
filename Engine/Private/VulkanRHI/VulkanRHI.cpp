@@ -15,7 +15,7 @@
 constexpr uint32_t WIDTH = 800;
 constexpr uint32_t HEIGHT = 600;
 
-FVulkanRHI::FVulkanRHI() {}
+FVulkanRHI::FVulkanRHI() { commandBuffer = VK_NULL_HANDLE; }
 
 void FVulkanRHI::Init()
 {
