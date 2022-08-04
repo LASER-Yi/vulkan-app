@@ -26,6 +26,8 @@ class FVulkanDevice
 
     FVulkanSwapChain* GetSwapChain() const { return swapChain.get(); }
 
+    VkRenderPass GetRenderPass() const { return renderPass; }
+
   protected:
     VkDevice device;
 
@@ -37,6 +39,14 @@ class FVulkanDevice
     QueueFamilyIndices indices;
     std::vector<std::shared_ptr<FVulkanShader>> shaders;
 
+    // TODO: Move to separate class
+    VkPipelineLayout pipelineLayout;
+    VkPipeline graphicsPipeline;
+
+    VkRenderPass renderPass;
+
   private:
     void InitDeviceQueue();
+    void InitPipeline();
+    void InitRenderPass();
 };

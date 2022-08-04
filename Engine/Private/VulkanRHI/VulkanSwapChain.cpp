@@ -2,6 +2,7 @@
 #include "VulkanRHI/VulkanCommon.h"
 #include "VulkanRHI/VulkanDevice.h"
 #include <cassert>
+#include <cstddef>
 #include <stdexcept>
 
 FVulkanSwapChain::FVulkanSwapChain(VkSwapchainKHR swapChain,
@@ -23,6 +24,11 @@ FVulkanSwapChain::FVulkanSwapChain(VkSwapchainKHR swapChain,
 FVulkanSwapChain::~FVulkanSwapChain()
 {
     VkDevice _device = logicalDevice->GetDevice();
+
+    for (auto framebuffer : frameBuffers) {
+        vkDestroyFramebuffer(_device, framebuffer, nullptr);
+    }
+    frameBuffers.clear();
 
     for (auto imageView : ImageViews) {
         vkDestroyImageView(_device, imageView, nullptr);
@@ -64,6 +70,34 @@ void FVulkanSwapChain::CreateImageViews()
 
         if (CreateResult != VK_SUCCESS) {
             throw std::runtime_error("Failed to create image view");
+        }
+    }
+}
+
+void FVulkanSwapChain::CreateFrameBuffers()
+{
+    const size_t size = Images.size();
+    frameBuffers.resize(size);
+
+    for (size_t i = 0; i < size; i++) {
+        VkImageView attachments[] = {ImageViews[i]};
+
+        VkFramebufferCreateInfo createInfo = {};
+        ZeroVulkanStruct(createInfo, VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO);
+        createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+
+        createInfo.renderPass = logicalDevice->GetRenderPass();
+        createInfo.attachmentCount = 1;
+        createInfo.pAttachments = attachments;
+        createInfo.width = Extent.width;
+        createInfo.height = Extent.height;
+        createInfo.layers = 1;
+
+        const VkResult CreateResult = vkCreateFramebuffer(
+            logicalDevice->GetDevice(), &createInfo, nullptr, &frameBuffers[i]);
+
+        if (CreateResult != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create frame buffer");
         }
     }
 }

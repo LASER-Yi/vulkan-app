@@ -18,6 +18,8 @@ class FVulkanSwapChain
     VkFormat GetFormat() const { return ImageFormat; }
     VkExtent2D GetExtent() const { return Extent; }
 
+    void CreateFrameBuffers();
+
   protected:
     FVulkanDevice* logicalDevice;
 
@@ -26,6 +28,8 @@ class FVulkanSwapChain
     std::vector<VkImageView> ImageViews;
     VkFormat ImageFormat;
     VkExtent2D Extent;
+
+    std::vector<VkFramebuffer> frameBuffers;
 
   private:
     void CreateImageViews();

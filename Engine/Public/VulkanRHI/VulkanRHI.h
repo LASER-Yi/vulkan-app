@@ -27,14 +27,6 @@ class FVulkanRHI
     std::unique_ptr<FVulkanInstance> Instance;
     GLFWwindow* window;
 
-    // TODO: Move to separate class
-    VkPipelineLayout pipelineLayout;
-    VkPipeline graphicsPipeline;
-
-    VkRenderPass renderPass;
-
   private:
     void CreateWindow();
-    void CreatePipeline();
-    void CreateRenderPass();
 };
