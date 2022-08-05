@@ -22,13 +22,13 @@ class FVulkanGpu
 
     void InitLogicalDevice();
 
-    QueueFamilyIndices GetQueueFamilies() const;
+    FQueueFamilyIndices GetQueueFamilies() const;
     const VkPhysicalDeviceProperties GetProperties() const;
     const VkPhysicalDeviceFeatures GetFeatures() const;
 
     std::vector<VkExtensionProperties> GetExtensions() const;
 
-    SwapChainSupportDetails GetSwapChainSupportDetails() const;
+    FSwapChainSupportDetails GetSwapChainSupportDetails() const;
 
     bool IsValid() const;
     uint32_t GetScore() const;

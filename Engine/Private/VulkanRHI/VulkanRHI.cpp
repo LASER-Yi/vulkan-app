@@ -91,9 +91,7 @@ void FVulkanRHI::Draw()
 
     FVulkanDevice* _device = Instance->GetPhysicalDevice()->GetLogicalDevice();
 
-    _device->WaitRenderFinished();
-
-    const uint32_t imageIndex = _device->GetSwapChain()->GetNextImageIndex();
+    _device->BeginNextFrame();
 
     if (commandBuffer == VK_NULL_HANDLE) {
         commandBuffer = _device->CreateCommandBuffer();
@@ -101,54 +99,8 @@ void FVulkanRHI::Draw()
         vkResetCommandBuffer(commandBuffer, 0);
     }
 
-    _device->Submit(commandBuffer, imageIndex);
+    _device->Render(commandBuffer);
+    _device->Submit(commandBuffer);
 
-    // TODO: Move to somewhere else
-    VkSubmitInfo submitInfo = {};
-    ZeroVulkanStruct(submitInfo, VK_STRUCTURE_TYPE_SUBMIT_INFO);
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-    VkSemaphore waitSemaphores[] = {
-        _device->GetSwapChain()->GetImageAvailableSemaphore()};
-
-    submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = waitSemaphores;
-
-    VkPipelineStageFlags waitStages[] = {
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-    submitInfo.pWaitDstStageMask = waitStages;
-
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
-
-    VkSemaphore signalSemaphores[] = {
-        _device->GetSwapChain()->GetRenderFinishedSemaphore()};
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = signalSemaphores;
-
-    VkQueue graphicsQueue = _device->GetGraphicsQueue();
-    VkFence renderFence = _device->TEMP_GetRenderFence();
-    if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, renderFence) !=
-        VK_SUCCESS) {
-        throw std::runtime_error("Failed to submit draw command buffer!");
-    }
-
-    // Presentation
-    VkPresentInfoKHR presentInfo = {};
-    ZeroVulkanStruct(presentInfo, VK_STRUCTURE_TYPE_PRESENT_INFO_KHR);
-    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-
-    presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = signalSemaphores;
-
-    VkSwapchainKHR swapChains[] = {
-        _device->GetSwapChain()->TEMP_GetSwapChain()};
-
-    presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = swapChains;
-    presentInfo.pImageIndices = &imageIndex;
-
-    presentInfo.pResults = nullptr;
-
-    vkQueuePresentKHR(graphicsQueue, &presentInfo);
+    _device->GetSwapChain()->Present();
 }

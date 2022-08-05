@@ -37,9 +37,9 @@ FVulkanGpu::~FVulkanGpu()
     device = VK_NULL_HANDLE;
 }
 
-QueueFamilyIndices FVulkanGpu::GetQueueFamilies() const
+FQueueFamilyIndices FVulkanGpu::GetQueueFamilies() const
 {
-    QueueFamilyIndices indices;
+    FQueueFamilyIndices indices;
 
     uint32_t queueFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount,
@@ -112,7 +112,7 @@ bool FVulkanGpu::IsValid() const
 
     const bool IsExtensionAvailable = requiredExts.empty();
 
-    const QueueFamilyIndices indices = GetQueueFamilies();
+    const FQueueFamilyIndices indices = GetQueueFamilies();
 
     return IsExtensionAvailable && indices.isValid();
 }
@@ -141,7 +141,7 @@ uint32_t FVulkanGpu::GetScore() const
 void FVulkanGpu::InitLogicalDevice()
 {
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-    const QueueFamilyIndices indices = GetQueueFamilies();
+    const FQueueFamilyIndices indices = GetQueueFamilies();
 
     const std::set<uint32_t> uniqueQueueFamilies = {
         indices.graphicsFamily.value(), indices.presentFamily.value()};
@@ -216,7 +216,7 @@ FVulkanDevice* FVulkanGpu::GetLogicalDevice() const
     return logicalDevice.get();
 }
 
-SwapChainSupportDetails FVulkanGpu::GetSwapChainSupportDetails() const
+FSwapChainSupportDetails FVulkanGpu::GetSwapChainSupportDetails() const
 {
-    return SwapChainSupportDetails(device, surface);
+    return FSwapChainSupportDetails(device, surface);
 }

@@ -2,7 +2,7 @@
 
 #include <optional>
 
-struct QueueFamilyIndices {
+struct FQueueFamilyIndices {
     std::optional<uint32_t> graphicsFamily;
     std::optional<uint32_t> presentFamily;
 

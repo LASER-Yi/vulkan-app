@@ -4,12 +4,13 @@
 #include <cassert>
 #include <cstddef>
 #include <stdexcept>
+#include <vector>
 
 FVulkanSwapChain::FVulkanSwapChain(VkSwapchainKHR swapChain,
                                    FVulkanDevice* device, VkFormat format,
                                    VkExtent2D extent)
     : swapChain(swapChain), logicalDevice(device), ImageFormat(format),
-      Extent(extent)
+      Extent(extent), cachedNextImage(0)
 {
     VkDevice _device = logicalDevice->GetDevice();
 
@@ -106,10 +107,10 @@ void FVulkanSwapChain::CreateFrameBuffers()
     }
 }
 
-VkFramebuffer FVulkanSwapChain::GetFrameBuffer(uint32_t index) const
+VkFramebuffer FVulkanSwapChain::GetFrameBuffer() const
 {
-    assert(index < frameBuffers.size());
-    return frameBuffers[index];
+    assert(cachedNextImage < frameBuffers.size());
+    return frameBuffers[cachedNextImage];
 }
 
 void FVulkanSwapChain::CreateSyncObjects()
@@ -127,13 +128,44 @@ void FVulkanSwapChain::CreateSyncObjects()
     }
 }
 
-uint32_t FVulkanSwapChain::GetNextImageIndex() const
+uint32_t FVulkanSwapChain::AcquireNextImage()
 {
     uint32_t nextImageIndex = 0;
-    vkAcquireNextImageKHR(logicalDevice->GetDevice(), swapChain,
-                          std::numeric_limits<uint64_t>::max(),
-                          imageAvailableSemaphore, VK_NULL_HANDLE,
-                          &nextImageIndex);
+    const VkResult AcquireResult = vkAcquireNextImageKHR(
+        logicalDevice->GetDevice(), swapChain,
+        std::numeric_limits<uint64_t>::max(), imageAvailableSemaphore,
+        VK_NULL_HANDLE, &nextImageIndex);
+
+    if (AcquireResult != VK_SUCCESS) {
+        throw std::runtime_error("Failed to acquire next image index");
+    }
+
+    cachedNextImage = nextImageIndex;
 
     return nextImageIndex;
+}
+
+void FVulkanSwapChain::Present()
+{
+    VkPresentInfoKHR presentInfo = {};
+    ZeroVulkanStruct(presentInfo, VK_STRUCTURE_TYPE_PRESENT_INFO_KHR);
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+
+    const std::vector<VkSemaphore> waitSemaphores = {
+        GetRenderFinishedSemaphore()};
+
+    presentInfo.waitSemaphoreCount = waitSemaphores.size();
+    presentInfo.pWaitSemaphores = waitSemaphores.data();
+
+    VkSwapchainKHR swapChains[] = {swapChain};
+
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = swapChains;
+    presentInfo.pImageIndices = &cachedNextImage;
+
+    presentInfo.pResults = nullptr;
+
+    VkQueue graphicsQueue = logicalDevice->GetGraphicsQueue();
+
+    vkQueuePresentKHR(graphicsQueue, &presentInfo);
 }

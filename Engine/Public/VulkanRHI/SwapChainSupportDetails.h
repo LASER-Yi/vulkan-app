@@ -7,7 +7,7 @@
 
 class GLFWwindow;
 
-struct SwapChainSupportDetails {
+struct FSwapChainSupportDetails {
     VkSurfaceCapabilitiesKHR capabilities;
     std::vector<VkSurfaceFormatKHR> formats;
     std::vector<VkPresentModeKHR> presentModes;
@@ -16,8 +16,8 @@ struct SwapChainSupportDetails {
     VkSurfaceKHR surface;
 
   public:
-    SwapChainSupportDetails(const VkPhysicalDevice device,
-                            const VkSurfaceKHR surface);
+    FSwapChainSupportDetails(const VkPhysicalDevice device,
+                             const VkSurfaceKHR surface);
 
     VkSurfaceKHR GetSurface() const { return surface; }
 

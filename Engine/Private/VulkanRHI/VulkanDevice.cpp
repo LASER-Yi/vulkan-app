@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <limits>
 #include <stdexcept>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 FVulkanDevice::FVulkanDevice(VkDevice device, FVulkanGpu* physicalDevice)
@@ -61,7 +62,7 @@ FVulkanDevice::CreateShader(const std::string& filename,
     return _shader;
 }
 
-void FVulkanDevice::Submit(VkCommandBuffer commandBuffer, uint32_t imageIndex)
+void FVulkanDevice::Render(VkCommandBuffer commandBuffer)
 {
     VkCommandBufferBeginInfo beginInfo = {};
     ZeroVulkanStruct(beginInfo, VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO);
@@ -77,7 +78,7 @@ void FVulkanDevice::Submit(VkCommandBuffer commandBuffer, uint32_t imageIndex)
     ZeroVulkanStruct(renderPassInfo, VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO);
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderPassInfo.renderPass = renderPass;
-    renderPassInfo.framebuffer = swapChain->GetFrameBuffer(imageIndex);
+    renderPassInfo.framebuffer = swapChain->GetFrameBuffer();
     renderPassInfo.renderArea.offset = {0, 0};
     renderPassInfo.renderArea.extent = swapChain->GetExtent();
 
@@ -107,6 +108,37 @@ void FVulkanDevice::Submit(VkCommandBuffer commandBuffer, uint32_t imageIndex)
 
     if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
         throw std::runtime_error("failed to record command buffer!");
+    }
+}
+
+void FVulkanDevice::Submit(VkCommandBuffer commandBuffer)
+{
+    VkSubmitInfo submitInfo = {};
+    ZeroVulkanStruct(submitInfo, VK_STRUCTURE_TYPE_SUBMIT_INFO);
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    VkSemaphore waitSemaphores[] = {
+        GetSwapChain()->GetImageAvailableSemaphore()};
+
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = waitSemaphores;
+
+    VkPipelineStageFlags waitStages[] = {
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    submitInfo.pWaitDstStageMask = waitStages;
+
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+
+    VkSemaphore signalSemaphores[] = {
+        GetSwapChain()->GetRenderFinishedSemaphore()};
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = signalSemaphores;
+
+    VkQueue graphicsQueue = GetGraphicsQueue();
+    if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inRenderFence) !=
+        VK_SUCCESS) {
+        throw std::runtime_error("Failed to submit draw command buffer!");
     }
 }
 
@@ -431,6 +463,15 @@ void FVulkanDevice::InitCommandPool()
     }
 }
 
+void FVulkanDevice::BeginNextFrame()
+{
+    vkWaitForFences(device, 1, &inRenderFence, VK_TRUE,
+                    std::numeric_limits<uint64_t>::max());
+    vkResetFences(device, 1, &inRenderFence);
+
+    GetSwapChain()->AcquireNextImage();
+}
+
 VkCommandBuffer FVulkanDevice::CreateCommandBuffer()
 {
     VkCommandBufferAllocateInfo allocInfo = {};
@@ -457,13 +498,6 @@ VkCommandBuffer FVulkanDevice::CreateCommandBuffer()
     }
 
     return commandBuffer;
-}
-
-void FVulkanDevice::WaitRenderFinished()
-{
-    vkWaitForFences(device, 1, &inRenderFence, VK_TRUE,
-                    std::numeric_limits<uint64_t>::max());
-    vkResetFences(device, 1, &inRenderFence);
 }
 
 void FVulkanDevice::InitFences()

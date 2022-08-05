@@ -6,8 +6,8 @@
 #include <stdint.h>
 #include <vulkan/vulkan_core.h>
 
-SwapChainSupportDetails::SwapChainSupportDetails(const VkPhysicalDevice device,
-                                                 const VkSurfaceKHR surface)
+FSwapChainSupportDetails::FSwapChainSupportDetails(
+    const VkPhysicalDevice device, const VkSurfaceKHR surface)
     : device(device), surface(surface)
 {
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &capabilities);
@@ -37,7 +37,7 @@ SwapChainSupportDetails::SwapChainSupportDetails(const VkPhysicalDevice device,
     }
 }
 
-VkSurfaceFormatKHR SwapChainSupportDetails::GetRequiredSurfaceFormat() const
+VkSurfaceFormatKHR FSwapChainSupportDetails::GetRequiredSurfaceFormat() const
 {
     for (const VkSurfaceFormatKHR& format : formats) {
         if (format.format == VK_FORMAT_B8G8R8A8_SRGB &&
@@ -48,7 +48,7 @@ VkSurfaceFormatKHR SwapChainSupportDetails::GetRequiredSurfaceFormat() const
     return formats[0];
 }
 
-VkPresentModeKHR SwapChainSupportDetails::GetRequiredPresentMode() const
+VkPresentModeKHR FSwapChainSupportDetails::GetRequiredPresentMode() const
 {
     /*
         VK_PRESENT_MODE_IMMEDIATE_KHR: No buffer
@@ -72,16 +72,16 @@ VkPresentModeKHR SwapChainSupportDetails::GetRequiredPresentMode() const
         }
     }
 
-    if (HasTripleBuffer) {
-        return VK_PRESENT_MODE_MAILBOX_KHR;
-    } else if (HasDoubleBuffer) {
+    if (HasDoubleBuffer) {
         return VK_PRESENT_MODE_FIFO_KHR;
+    } else if (HasTripleBuffer) {
+        return VK_PRESENT_MODE_MAILBOX_KHR;
     }
 
     return presentModes[0];
 }
 
-VkExtent2D SwapChainSupportDetails::GetRequiredExtent(GLFWwindow* window) const
+VkExtent2D FSwapChainSupportDetails::GetRequiredExtent(GLFWwindow* window) const
 {
     if (capabilities.currentExtent.width !=
         std::numeric_limits<uint32_t>::max()) {
@@ -105,14 +105,14 @@ VkExtent2D SwapChainSupportDetails::GetRequiredExtent(GLFWwindow* window) const
     }
 }
 
-uint32_t SwapChainSupportDetails::GetImageCount() const
+uint32_t FSwapChainSupportDetails::GetImageCount() const
 {
     const uint32_t min = capabilities.minImageCount;
     const uint32_t max = capabilities.maxImageCount;
     return std::clamp(min + 1, min, max);
 }
 
-bool SwapChainSupportDetails::IsValid() const
+bool FSwapChainSupportDetails::IsValid() const
 {
     return !formats.empty() && !presentModes.empty();
 }

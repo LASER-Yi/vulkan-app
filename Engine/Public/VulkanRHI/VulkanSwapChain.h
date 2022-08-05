@@ -19,9 +19,10 @@ class FVulkanSwapChain
     VkExtent2D GetExtent() const { return Extent; }
 
     void CreateFrameBuffers();
-    VkFramebuffer GetFrameBuffer(uint32_t index) const;
+    VkFramebuffer GetFrameBuffer() const;
 
-    uint32_t GetNextImageIndex() const;
+    uint32_t AcquireNextImage();
+    uint32_t GetCurrentImage() const { return cachedNextImage; };
 
     VkSemaphore GetImageAvailableSemaphore() const
     {
@@ -33,7 +34,7 @@ class FVulkanSwapChain
         return renderFinishedSemaphore;
     }
 
-    VkSwapchainKHR TEMP_GetSwapChain() const { return swapChain; }
+    void Present();
 
   protected:
     FVulkanDevice* logicalDevice;
@@ -45,6 +46,8 @@ class FVulkanSwapChain
     VkExtent2D Extent;
 
     std::vector<VkFramebuffer> frameBuffers;
+
+    uint32_t cachedNextImage;
 
     // sync objects
     VkSemaphore imageAvailableSemaphore;

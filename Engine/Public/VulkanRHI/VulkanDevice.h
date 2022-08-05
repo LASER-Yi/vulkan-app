@@ -28,15 +28,14 @@ class FVulkanDevice
 
     FVulkanSwapChain* GetSwapChain() const { return swapChain.get(); }
 
-    void WaitRenderFinished();
-
     VkRenderPass GetRenderPass() const { return renderPass; }
+
+    void BeginNextFrame();
 
     VkCommandBuffer CreateCommandBuffer();
 
-    void Submit(VkCommandBuffer commandBuffer, uint32_t imageIndex);
-
-    VkFence TEMP_GetRenderFence() const { return inRenderFence; }
+    void Render(VkCommandBuffer commandBuffer);
+    void Submit(VkCommandBuffer commandBuffer);
 
   protected:
     FVulkanGpu* physicalDevice;
