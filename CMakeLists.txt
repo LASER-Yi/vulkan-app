@@ -16,6 +16,9 @@ list(APPEND CMAKE_MODULE_PATH
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
+# Enable AddressSanitizer across all projects
+include(AddressSanitizer)
+
 # Third party libraries
 # GLFW3
 include(GLFW)
