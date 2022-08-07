@@ -18,7 +18,6 @@ class FVulkanSwapChain
     VkFormat GetFormat() const { return ImageFormat; }
     VkExtent2D GetExtent() const { return Extent; }
 
-    void CreateFrameBuffers();
     VkFramebuffer GetFrameBuffer() const;
 
     uint32_t AcquireNextImage();
@@ -55,5 +54,6 @@ class FVulkanSwapChain
 
   private:
     void CreateImageViews();
+    void CreateFrameBuffers();
     void CreateSyncObjects();
 };

@@ -20,6 +20,7 @@ FVulkanSwapChain::FVulkanSwapChain(VkSwapchainKHR swapChain,
     vkGetSwapchainImagesKHR(_device, swapChain, &imageCount, Images.data());
 
     CreateImageViews();
+    CreateFrameBuffers();
     CreateSyncObjects();
 }
 

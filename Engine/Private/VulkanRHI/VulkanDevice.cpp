@@ -2,6 +2,7 @@
 
 #include "Core/FileManager.h"
 #include "VulkanRHI/QueueFamilyIndices.h"
+#include "VulkanRHI/SwapChainSupportDetails.h"
 #include "VulkanRHI/VulkanCommon.h"
 #include "VulkanRHI/VulkanGPU.h"
 #include "VulkanRHI/VulkanShader.h"
@@ -17,15 +18,13 @@
 FVulkanDevice::FVulkanDevice(VkDevice device, FVulkanGpu* physicalDevice)
     : device(device), physicalDevice(physicalDevice)
 {
-    InitSwapChain();
-    InitDeviceQueue();
-
     InitRenderPass();
     InitPipeline();
 
     InitCommandPool();
 
-    swapChain->CreateFrameBuffers();
+    InitSwapChain();
+    InitDeviceQueue();
 
     InitFences();
 }
@@ -249,8 +248,11 @@ void FVulkanDevice::InitPipeline()
     inputAssemblyInfo.primitiveRestartEnable = VK_FALSE;
 
     // Viewports
-    FVulkanSwapChain* swapChain = GetSwapChain();
-    const VkExtent2D extent = swapChain->GetExtent();
+    const FSwapChainSupportDetails swapChainDetails =
+        physicalDevice->GetSwapChainSupportDetails();
+
+    // TODO: Improve API
+    const VkExtent2D extent = swapChainDetails.GetRequiredExtent(nullptr);
 
     viewport.x = 0.0f;
     viewport.y = 0.0f;
@@ -386,9 +388,12 @@ void FVulkanDevice::InitPipeline()
 
 void FVulkanDevice::InitRenderPass()
 {
+    const FSwapChainSupportDetails swapChainDetails =
+        physicalDevice->GetSwapChainSupportDetails();
+
     // Attachment description
     VkAttachmentDescription colorAttachment = {};
-    colorAttachment.format = GetSwapChain()->GetFormat();
+    colorAttachment.format = swapChainDetails.GetRequiredSurfaceFormat().format;
     colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
 
     // Before rendering
