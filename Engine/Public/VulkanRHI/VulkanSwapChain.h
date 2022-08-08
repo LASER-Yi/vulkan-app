@@ -11,8 +11,8 @@ class FVulkanDevice;
 class FVulkanSwapChain
 {
   public:
-    FVulkanSwapChain(VkSwapchainKHR swapChain, FVulkanDevice* device,
-                     VkFormat format, VkExtent2D extent);
+    FVulkanSwapChain(FVulkanDevice* device);
+    FVulkanSwapChain(const FVulkanSwapChain& other) = delete;
     ~FVulkanSwapChain();
 
     VkFormat GetFormat() const { return ImageFormat; }
@@ -35,6 +35,10 @@ class FVulkanSwapChain
 
     void Present();
 
+    void Recreate();
+
+    void SetNeedResize();
+
   protected:
     FVulkanDevice* logicalDevice;
 
@@ -48,12 +52,17 @@ class FVulkanSwapChain
 
     uint32_t cachedNextImage;
 
+    bool bSwapchainNeedsResize;
+
     // sync objects
     VkSemaphore imageAvailableSemaphore;
     VkSemaphore renderFinishedSemaphore;
 
   private:
+    void CreateSwapChain();
     void CreateImageViews();
     void CreateFrameBuffers();
     void CreateSyncObjects();
+
+    void Destroy();
 };

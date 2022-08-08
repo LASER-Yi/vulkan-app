@@ -9,3 +9,5 @@
 #endif
 
 #define GE_VALIDATION_LAYERS BUILD_DEBUG
+
+#define INDEX_NONE -1

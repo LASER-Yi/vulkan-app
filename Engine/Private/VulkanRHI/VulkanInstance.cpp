@@ -15,7 +15,8 @@
 std::vector<const char*> FVulkanInstance::validationLayers = {
     "VK_LAYER_KHRONOS_validation"};
 
-FVulkanInstance::FVulkanInstance(GLFWwindow* window)
+FVulkanInstance::FVulkanInstance(GLFWwindow* window):
+    instance(VK_NULL_HANDLE), surface(VK_NULL_HANDLE)
 {
     assert(window != nullptr);
 

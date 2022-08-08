@@ -75,8 +75,21 @@ void FVulkanRHI::CreateWindow()
     glfwInit();
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan window", nullptr, nullptr);
+
+    glfwSetWindowUserPointer(window, this);
+    glfwSetFramebufferSizeCallback(window, OnFramebufferResize);
+}
+
+void FVulkanRHI::OnFramebufferResize(GLFWwindow* window, int width, int height)
+{
+    auto rhi = reinterpret_cast<FVulkanRHI*>(glfwGetWindowUserPointer(window));
+
+    rhi->GetInstance()
+        ->GetPhysicalDevice()
+        ->GetLogicalDevice()
+        ->GetSwapChain()
+        ->SetNeedResize();
 }
 
 void FVulkanRHI::Draw()

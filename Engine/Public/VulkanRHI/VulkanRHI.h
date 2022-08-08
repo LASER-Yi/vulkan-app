@@ -4,6 +4,7 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 
+#include "GLFW/glfw3.h"
 #include "VulkanInstance.h"
 
 class GLFWwindow;
@@ -34,4 +35,6 @@ class FVulkanRHI
     void CreateWindow();
 
     void Draw();
+
+    static void OnFramebufferResize(GLFWwindow* window, int width, int height);
 };

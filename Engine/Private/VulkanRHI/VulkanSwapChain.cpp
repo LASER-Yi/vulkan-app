@@ -1,24 +1,20 @@
 #include "VulkanRHI/VulkanSwapChain.h"
 #include "VulkanRHI/VulkanCommon.h"
 #include "VulkanRHI/VulkanDevice.h"
+#include "VulkanRHI/VulkanGPU.h"
+
 #include <cassert>
 #include <cstddef>
 #include <stdexcept>
 #include <vector>
 
-FVulkanSwapChain::FVulkanSwapChain(VkSwapchainKHR swapChain,
-                                   FVulkanDevice* device, VkFormat format,
-                                   VkExtent2D extent)
-    : swapChain(swapChain), logicalDevice(device), ImageFormat(format),
-      Extent(extent), cachedNextImage(0)
+FVulkanSwapChain::FVulkanSwapChain(FVulkanDevice* device)
+    : logicalDevice(device), swapChain(VK_NULL_HANDLE), cachedNextImage(0),
+      bSwapchainNeedsResize(false)
 {
     VkDevice _device = logicalDevice->GetDevice();
 
-    uint32_t imageCount = 0;
-    vkGetSwapchainImagesKHR(_device, swapChain, &imageCount, nullptr);
-    Images.resize(imageCount);
-    vkGetSwapchainImagesKHR(_device, swapChain, &imageCount, Images.data());
-
+    CreateSwapChain();
     CreateImageViews();
     CreateFrameBuffers();
     CreateSyncObjects();
@@ -31,19 +27,68 @@ FVulkanSwapChain::~FVulkanSwapChain()
     vkDestroySemaphore(_device, imageAvailableSemaphore, nullptr);
     vkDestroySemaphore(_device, renderFinishedSemaphore, nullptr);
 
-    for (auto framebuffer : frameBuffers) {
-        vkDestroyFramebuffer(_device, framebuffer, nullptr);
-    }
-    frameBuffers.clear();
+    Destroy();
+}
 
-    for (auto imageView : ImageViews) {
-        vkDestroyImageView(_device, imageView, nullptr);
-    }
-    ImageViews.clear();
-    Images.clear();
+void FVulkanSwapChain::CreateSwapChain()
+{
+    VkDevice _device = logicalDevice->GetDevice();
+    FVulkanGpu* gpu = logicalDevice->GetPhysicalDevice();
 
-    vkDestroySwapchainKHR(_device, swapChain, nullptr);
-    swapChain = VK_NULL_HANDLE;
+    const auto details = gpu->GetSwapChainSupportDetails();
+    assert(details.IsValid());
+
+    const VkSurfaceFormatKHR surfaceFormat = details.GetRequiredSurfaceFormat();
+
+    VkSwapchainCreateInfoKHR createInfo = {};
+    ZeroVulkanStruct(createInfo, VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR);
+    createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    createInfo.surface = details.GetSurface();
+    createInfo.minImageCount = details.GetImageCount();
+
+    createInfo.presentMode = details.GetRequiredPresentMode();
+    createInfo.clipped = VK_TRUE;
+
+    createInfo.imageFormat = surfaceFormat.format;
+    createInfo.imageColorSpace = surfaceFormat.colorSpace;
+
+    // TODO: Better struct
+    createInfo.imageExtent = details.GetRequiredExtent(nullptr);
+
+    createInfo.imageArrayLayers = 1;
+    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    const auto indices = gpu->GetQueueFamilies();
+
+    const uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(),
+                                           indices.presentFamily.value()};
+
+    if (indices.graphicsFamily != indices.presentFamily) {
+        createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+        createInfo.queueFamilyIndexCount = 2;
+        createInfo.pQueueFamilyIndices = queueFamilyIndices;
+    } else {
+        createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    }
+
+    createInfo.preTransform = details.capabilities.currentTransform;
+    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+
+    createInfo.oldSwapchain = VK_NULL_HANDLE;
+
+    const VkResult CreateResult =
+        vkCreateSwapchainKHR(_device, &createInfo, nullptr, &swapChain);
+
+    if (CreateResult != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create swap chain");
+    }
+    ImageFormat = createInfo.imageFormat;
+    Extent = createInfo.imageExtent;
+
+    uint32_t imageCount = 0;
+    vkGetSwapchainImagesKHR(_device, swapChain, &imageCount, nullptr);
+    Images.resize(imageCount);
+    vkGetSwapchainImagesKHR(_device, swapChain, &imageCount, Images.data());
 }
 
 void FVulkanSwapChain::CreateImageViews()
@@ -129,15 +174,46 @@ void FVulkanSwapChain::CreateSyncObjects()
     }
 }
 
+void FVulkanSwapChain::Destroy()
+{
+    VkDevice _device = logicalDevice->GetDevice();
+
+    for (auto framebuffer : frameBuffers) {
+        vkDestroyFramebuffer(_device, framebuffer, nullptr);
+    }
+    frameBuffers.clear();
+
+    for (auto imageView : ImageViews) {
+        vkDestroyImageView(_device, imageView, nullptr);
+    }
+    ImageViews.clear();
+    Images.clear();
+
+    vkDestroySwapchainKHR(_device, swapChain, nullptr);
+    swapChain = VK_NULL_HANDLE;
+}
+
 uint32_t FVulkanSwapChain::AcquireNextImage()
 {
+    if (bSwapchainNeedsResize) {
+        bSwapchainNeedsResize = false;
+        Recreate();
+    }
+
     uint32_t nextImageIndex = 0;
     const VkResult AcquireResult = vkAcquireNextImageKHR(
         logicalDevice->GetDevice(), swapChain,
         std::numeric_limits<uint64_t>::max(), imageAvailableSemaphore,
         VK_NULL_HANDLE, &nextImageIndex);
 
-    if (AcquireResult != VK_SUCCESS) {
+    switch (AcquireResult) {
+    case VK_ERROR_OUT_OF_DATE_KHR:
+        Recreate();
+        [[clang::fallthrough]];
+    case VK_SUCCESS:
+    case VK_SUBOPTIMAL_KHR:
+        break;
+    default:
         throw std::runtime_error("Failed to acquire next image index");
     }
 
@@ -158,7 +234,7 @@ void FVulkanSwapChain::Present()
     presentInfo.waitSemaphoreCount = waitSemaphores.size();
     presentInfo.pWaitSemaphores = waitSemaphores.data();
 
-    VkSwapchainKHR swapChains[] = {swapChain};
+    const VkSwapchainKHR swapChains[] = {swapChain};
 
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapChains;
@@ -170,3 +246,20 @@ void FVulkanSwapChain::Present()
 
     vkQueuePresentKHR(graphicsQueue, &presentInfo);
 }
+
+void FVulkanSwapChain::Recreate()
+{
+    VkDevice vk_device = logicalDevice->GetDevice();
+
+    vkDeviceWaitIdle(vk_device);
+
+    // TODO: Handle minimization (width = 0, height = 0)
+
+    Destroy();
+
+    CreateSwapChain();
+    CreateImageViews();
+    CreateFrameBuffers();
+}
+
+void FVulkanSwapChain::SetNeedResize() { bSwapchainNeedsResize = true; }

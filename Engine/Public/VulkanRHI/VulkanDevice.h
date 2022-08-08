@@ -26,6 +26,8 @@ class FVulkanDevice
 
     VkDevice GetDevice() const { return device; }
 
+    FVulkanGpu* GetPhysicalDevice() const { return physicalDevice; }
+
     FVulkanSwapChain* GetSwapChain() const { return swapChain.get(); }
 
     VkRenderPass GetRenderPass() const { return renderPass; }
