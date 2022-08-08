@@ -5,7 +5,6 @@
 #include <utility>
 #include <vector>
 #include <vulkan/vulkan.hpp>
-#include <vulkan/vulkan_handles.hpp>
 
 #include "GLFW/glfw3.h"
 #include "VulkanRHI/VulkanCommon.h"
@@ -41,32 +40,26 @@ void FVulkanRHI::Render()
         Draw();
     }
 
-    VkDevice _device =
+    auto vk_device =
         Instance->GetPhysicalDevice()->GetLogicalDevice()->GetDevice();
 
-    vkDeviceWaitIdle(_device);
+    vk_device.waitIdle();
 }
 
 FVulkanInstance* FVulkanRHI::GetInstance() const { return Instance.get(); }
 
 std::vector<vk::ExtensionProperties> FVulkanRHI::GetAvailableExtensions()
 {
-    uint32_t extensionCount = 0;
-    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
-    std::vector<vk::ExtensionProperties> extensions(extensionCount);
-    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount,
-                                           extensions.data());
+    std::vector<vk::ExtensionProperties> extensions =
+        vk::enumerateInstanceExtensionProperties();
 
     return std::move(extensions);
 }
 
-std::vector<VkLayerProperties> FVulkanRHI::GetAvailableLayers()
+std::vector<vk::LayerProperties> FVulkanRHI::GetAvailableLayers()
 {
-    uint32_t layerCount = 0;
-    vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-
-    std::vector<VkLayerProperties> layers(layerCount);
-    vkEnumerateInstanceLayerProperties(&layerCount, layers.data());
+    std::vector<vk::LayerProperties> layers =
+        vk::enumerateInstanceLayerProperties();
 
     return std::move(layers);
 }
@@ -107,14 +100,15 @@ void FVulkanRHI::Draw()
 
     _device->BeginNextFrame();
 
-    if (commandBuffer == VK_NULL_HANDLE) {
-        commandBuffer = _device->CreateCommandBuffer();
+    if (commandBuffer == nullptr) {
+        commandBuffer =
+            std::make_shared<vk::CommandBuffer>(_device->CreateCommandBuffer());
     } else {
-        vkResetCommandBuffer(commandBuffer, 0);
+        commandBuffer->reset();
     }
 
-    _device->Render(commandBuffer);
-    _device->Submit(commandBuffer);
+    _device->Render(commandBuffer.get());
+    _device->Submit(commandBuffer.get());
 
     _device->GetSwapChain()->Present();
 }

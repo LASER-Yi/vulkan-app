@@ -16,8 +16,7 @@ struct FSwapChainSupportDetails {
     vk::SurfaceKHR surface;
 
   public:
-    FSwapChainSupportDetails(const vk::PhysicalDevice device,
-                             const vk::SurfaceKHR surface);
+    FSwapChainSupportDetails(vk::PhysicalDevice device, vk::SurfaceKHR surface);
 
     vk::SurfaceKHR GetSurface() const { return surface; }
 

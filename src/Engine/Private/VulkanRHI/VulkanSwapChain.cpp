@@ -5,15 +5,14 @@
 
 #include <cassert>
 #include <cstddef>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
 FVulkanSwapChain::FVulkanSwapChain(FVulkanDevice* device)
-    : logicalDevice(device), swapChain(VK_NULL_HANDLE), cachedNextImage(0),
+    : logicalDevice(device), swapChain(), cachedNextImage(0),
       bSwapchainNeedsResize(false)
 {
-    VkDevice _device = logicalDevice->GetDevice();
-
     CreateSwapChain();
     CreateImageViews();
     CreateFrameBuffers();
@@ -22,41 +21,40 @@ FVulkanSwapChain::FVulkanSwapChain(FVulkanDevice* device)
 
 FVulkanSwapChain::~FVulkanSwapChain()
 {
-    VkDevice _device = logicalDevice->GetDevice();
+    auto vk_device = logicalDevice->GetDevice();
 
-    vkDestroySemaphore(_device, imageAvailableSemaphore, nullptr);
-    vkDestroySemaphore(_device, renderFinishedSemaphore, nullptr);
+    vk_device.destroySemaphore(imageAvailableSemaphore);
+    vk_device.destroySemaphore(renderFinishedSemaphore);
 
     Destroy();
 }
 
 void FVulkanSwapChain::CreateSwapChain()
 {
-    VkDevice _device = logicalDevice->GetDevice();
+    auto vk_device = logicalDevice->GetDevice();
     FVulkanGpu* gpu = logicalDevice->GetPhysicalDevice();
 
     const auto details = gpu->GetSwapChainSupportDetails();
     assert(details.IsValid());
 
-    const VkSurfaceFormatKHR surfaceFormat = details.GetRequiredSurfaceFormat();
+    const vk::SurfaceFormatKHR surfaceFormat =
+        details.GetRequiredSurfaceFormat();
 
-    VkSwapchainCreateInfoKHR createInfo = {};
-    ZeroVulkanStruct(createInfo, VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR);
-    createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    createInfo.surface = details.GetSurface();
-    createInfo.minImageCount = details.GetImageCount();
-
-    createInfo.presentMode = details.GetRequiredPresentMode();
-    createInfo.clipped = VK_TRUE;
-
-    createInfo.imageFormat = surfaceFormat.format;
-    createInfo.imageColorSpace = surfaceFormat.colorSpace;
-
-    // TODO: Better struct
-    createInfo.imageExtent = details.GetRequiredExtent(nullptr);
-
-    createInfo.imageArrayLayers = 1;
-    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    vk::SwapchainCreateInfoKHR createInfo = {
+        .sType = vk::StructureType::eSwapchainCreateInfoKHR,
+        .surface = details.GetSurface(),
+        .minImageCount = details.GetImageCount(),
+        .presentMode = details.GetRequiredPresentMode(),
+        .clipped = VK_TRUE,
+        .imageFormat = surfaceFormat.format,
+        .imageColorSpace = surfaceFormat.colorSpace,
+        .imageExtent = details.GetRequiredExtent(nullptr),
+        .imageArrayLayers = 1,
+        .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
+        .preTransform = details.capabilities.currentTransform,
+        .compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque,
+        .oldSwapchain = nullptr,
+    };
 
     const auto indices = gpu->GetQueueFamilies();
 
@@ -64,64 +62,54 @@ void FVulkanSwapChain::CreateSwapChain()
                                            indices.presentFamily.value()};
 
     if (indices.graphicsFamily != indices.presentFamily) {
-        createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+        createInfo.imageSharingMode = vk::SharingMode::eConcurrent;
         createInfo.queueFamilyIndexCount = 2;
         createInfo.pQueueFamilyIndices = queueFamilyIndices;
     } else {
-        createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        createInfo.imageSharingMode = vk::SharingMode::eExclusive;
     }
 
-    createInfo.preTransform = details.capabilities.currentTransform;
-    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    VERIFY_VULKAN_RESULT(
+        vk_device.createSwapchainKHR(&createInfo, nullptr, &swapChain));
 
-    createInfo.oldSwapchain = VK_NULL_HANDLE;
-
-    const VkResult CreateResult =
-        vkCreateSwapchainKHR(_device, &createInfo, nullptr, &swapChain);
-
-    if (CreateResult != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create swap chain");
-    }
     ImageFormat = createInfo.imageFormat;
     Extent = createInfo.imageExtent;
 
-    uint32_t imageCount = 0;
-    vkGetSwapchainImagesKHR(_device, swapChain, &imageCount, nullptr);
-    Images.resize(imageCount);
-    vkGetSwapchainImagesKHR(_device, swapChain, &imageCount, Images.data());
+    Images = vk_device.getSwapchainImagesKHR(swapChain);
 }
 
 void FVulkanSwapChain::CreateImageViews()
 {
     ImageViews.resize(Images.size());
-    VkDevice _device = logicalDevice->GetDevice();
+    auto vk_device = logicalDevice->GetDevice();
 
     for (size_t i = 0; i < Images.size(); i++) {
-        VkImageViewCreateInfo createInfo = {};
-        ZeroVulkanStruct(createInfo, VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO);
-        createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        createInfo.image = Images[i];
+        const vk::ImageViewCreateInfo createInfo = {
+            .sType = vk::StructureType::eImageViewCreateInfo,
+            .image = Images[i],
+            .viewType = vk::ImageViewType::e2D,
+            .format = ImageFormat,
+            .components =
+                {
+                    .r = vk::ComponentSwizzle::eIdentity,
+                    .g = vk::ComponentSwizzle::eIdentity,
+                    .b = vk::ComponentSwizzle::eIdentity,
+                    .a = vk::ComponentSwizzle::eIdentity,
+                },
+            .subresourceRange =
+                {
+                    .aspectMask = vk::ImageAspectFlagBits::eColor,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1,
+                },
+        };
 
-        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        createInfo.format = ImageFormat;
+        vk::ImageView imageView =
+            vk_device.createImageView(createInfo, nullptr);
 
-        createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        createInfo.subresourceRange.baseMipLevel = 0;
-        createInfo.subresourceRange.levelCount = 1;
-        createInfo.subresourceRange.baseArrayLayer = 0;
-        createInfo.subresourceRange.layerCount = 1;
-
-        const VkResult CreateResult =
-            vkCreateImageView(_device, &createInfo, nullptr, &ImageViews[i]);
-
-        if (CreateResult != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create image view");
-        }
+        ImageViews[i] = imageView;
     }
 }
 
@@ -130,30 +118,27 @@ void FVulkanSwapChain::CreateFrameBuffers()
     const size_t size = Images.size();
     frameBuffers.resize(size);
 
+    auto vk_device = logicalDevice->GetDevice();
+
     for (size_t i = 0; i < size; i++) {
-        VkImageView attachments[] = {ImageViews[i]};
+        vk::ImageView attachments[] = {ImageViews[i]};
 
-        VkFramebufferCreateInfo createInfo = {};
-        ZeroVulkanStruct(createInfo, VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO);
-        createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        const vk::FramebufferCreateInfo createInfo = {
+            .sType = vk::StructureType::eFramebufferCreateInfo,
+            .renderPass = logicalDevice->GetRenderPass(),
+            .attachmentCount = 1,
+            .pAttachments = attachments,
+            .width = Extent.width,
+            .height = Extent.height,
+            .layers = 1,
+        };
 
-        createInfo.renderPass = logicalDevice->GetRenderPass();
-        createInfo.attachmentCount = 1;
-        createInfo.pAttachments = attachments;
-        createInfo.width = Extent.width;
-        createInfo.height = Extent.height;
-        createInfo.layers = 1;
-
-        const VkResult CreateResult = vkCreateFramebuffer(
-            logicalDevice->GetDevice(), &createInfo, nullptr, &frameBuffers[i]);
-
-        if (CreateResult != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create frame buffer");
-        }
+        VERIFY_VULKAN_RESULT(vk_device.createFramebuffer(&createInfo, nullptr,
+                                                         &frameBuffers[i]));
     }
 }
 
-VkFramebuffer FVulkanSwapChain::GetFrameBuffer() const
+vk::Framebuffer FVulkanSwapChain::GetFrameBuffer() const
 {
     assert(cachedNextImage < frameBuffers.size());
     return frameBuffers[cachedNextImage];
@@ -161,36 +146,35 @@ VkFramebuffer FVulkanSwapChain::GetFrameBuffer() const
 
 void FVulkanSwapChain::CreateSyncObjects()
 {
-    VkSemaphoreCreateInfo semaphoreInfo = {};
-    ZeroVulkanStruct(semaphoreInfo, VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO);
-    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    const vk::SemaphoreCreateInfo semaphoreInfo = {
+        .sType = vk::StructureType::eSemaphoreCreateInfo,
+    };
 
-    VkDevice _device = logicalDevice->GetDevice();
-    if (vkCreateSemaphore(_device, &semaphoreInfo, nullptr,
-                          &imageAvailableSemaphore) != VK_SUCCESS ||
-        vkCreateSemaphore(_device, &semaphoreInfo, nullptr,
-                          &renderFinishedSemaphore) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create semaphores!");
-    }
+    auto vk_device = logicalDevice->GetDevice();
+
+    VERIFY_VULKAN_RESULT(vk_device.createSemaphore(&semaphoreInfo, nullptr,
+                                                   &imageAvailableSemaphore));
+    VERIFY_VULKAN_RESULT(vk_device.createSemaphore(&semaphoreInfo, nullptr,
+                                                   &renderFinishedSemaphore));
 }
 
 void FVulkanSwapChain::Destroy()
 {
-    VkDevice _device = logicalDevice->GetDevice();
+    auto vk_device = logicalDevice->GetDevice();
 
     for (auto framebuffer : frameBuffers) {
-        vkDestroyFramebuffer(_device, framebuffer, nullptr);
+        vk_device.destroyFramebuffer(framebuffer);
     }
     frameBuffers.clear();
 
     for (auto imageView : ImageViews) {
-        vkDestroyImageView(_device, imageView, nullptr);
+        vk_device.destroyImageView(imageView);
     }
     ImageViews.clear();
     Images.clear();
 
-    vkDestroySwapchainKHR(_device, swapChain, nullptr);
-    swapChain = VK_NULL_HANDLE;
+    vk_device.destroySwapchainKHR(swapChain);
+    swapChain = nullptr;
 }
 
 uint32_t FVulkanSwapChain::AcquireNextImage()
@@ -201,17 +185,19 @@ uint32_t FVulkanSwapChain::AcquireNextImage()
     }
 
     uint32_t nextImageIndex = 0;
-    const VkResult AcquireResult = vkAcquireNextImageKHR(
-        logicalDevice->GetDevice(), swapChain,
-        std::numeric_limits<uint64_t>::max(), imageAvailableSemaphore,
-        VK_NULL_HANDLE, &nextImageIndex);
+
+    auto vk_device = logicalDevice->GetDevice();
+
+    const vk::Result AcquireResult = vk_device.acquireNextImageKHR(
+        swapChain, std::numeric_limits<uint64_t>::max(),
+        imageAvailableSemaphore, nullptr, &nextImageIndex);
 
     switch (AcquireResult) {
-    case VK_ERROR_OUT_OF_DATE_KHR:
+    case vk::Result::eErrorOutOfDateKHR:
         Recreate();
         [[clang::fallthrough]];
-    case VK_SUCCESS:
-    case VK_SUBOPTIMAL_KHR:
+    case vk::Result::eSuccess:
+    case vk::Result::eSuboptimalKHR:
         break;
     default:
         throw std::runtime_error("Failed to acquire next image index");
@@ -224,34 +210,32 @@ uint32_t FVulkanSwapChain::AcquireNextImage()
 
 void FVulkanSwapChain::Present()
 {
-    VkPresentInfoKHR presentInfo = {};
-    ZeroVulkanStruct(presentInfo, VK_STRUCTURE_TYPE_PRESENT_INFO_KHR);
-    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-
-    const std::vector<VkSemaphore> waitSemaphores = {
+    const std::vector<vk::Semaphore> waitSemaphores = {
         GetRenderFinishedSemaphore()};
 
-    presentInfo.waitSemaphoreCount = waitSemaphores.size();
-    presentInfo.pWaitSemaphores = waitSemaphores.data();
+    const std::vector<vk::SwapchainKHR> swapChains = {swapChain};
+    const std::vector<uint32_t> swapChainIndices = {cachedNextImage};
 
-    const VkSwapchainKHR swapChains[] = {swapChain};
+    const vk::PresentInfoKHR presentInfo = {
+        .sType = vk::StructureType::ePresentInfoKHR,
+        .waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size()),
+        .pWaitSemaphores = waitSemaphores.data(),
+        .swapchainCount = static_cast<uint32_t>(swapChains.size()),
+        .pSwapchains = swapChains.data(),
+        .pImageIndices = swapChainIndices.data(),
+        .pResults = nullptr,
+    };
 
-    presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = swapChains;
-    presentInfo.pImageIndices = &cachedNextImage;
+    vk::Queue* graphicsQueue = logicalDevice->GetGraphicsQueue();
 
-    presentInfo.pResults = nullptr;
-
-    VkQueue graphicsQueue = logicalDevice->GetGraphicsQueue();
-
-    vkQueuePresentKHR(graphicsQueue, &presentInfo);
+    VERIFY_VULKAN_RESULT(graphicsQueue->presentKHR(presentInfo));
 }
 
 void FVulkanSwapChain::Recreate()
 {
-    VkDevice vk_device = logicalDevice->GetDevice();
+    auto vk_device = logicalDevice->GetDevice();
 
-    vkDeviceWaitIdle(vk_device);
+    vk_device.waitIdle();
 
     // TODO: Handle minimization (width = 0, height = 0)
 

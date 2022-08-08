@@ -3,7 +3,6 @@
 #include <memory>
 #include <vector>
 #include <vulkan/vulkan.hpp>
-#include <vulkan/vulkan_handles.hpp>
 
 #include "GLFW/glfw3.h"
 #include "VulkanInstance.h"
@@ -30,7 +29,7 @@ class FVulkanRHI
     GLFWwindow* window;
 
     // TODO: refactor this
-    vk::CommandBuffer commandBuffer;
+    std::shared_ptr<vk::CommandBuffer> commandBuffer;
 
   private:
     void CreateWindow();

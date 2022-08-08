@@ -16,7 +16,7 @@ class FVulkanInstance;
 class FVulkanGpu
 {
   public:
-    FVulkanGpu(vk::PhysicalDevice device, vk::SurfaceKHR* surface,
+    FVulkanGpu(vk::PhysicalDevice device, FVulkanInstance* instance,
                const std::vector<const char*>& layers);
     ~FVulkanGpu();
 
@@ -33,13 +33,11 @@ class FVulkanGpu
     bool IsValid() const;
     uint32_t GetScore() const;
 
-    vk::SurfaceKHR* GetSurface() const;
-
     FVulkanDevice* GetLogicalDevice() const;
 
   protected:
     vk::PhysicalDevice device;
-    vk::SurfaceKHR* surface;
+    FVulkanInstance* instance;
 
     std::vector<const char*> layers;
 

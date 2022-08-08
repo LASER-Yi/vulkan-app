@@ -4,7 +4,6 @@
 #include <vulkan/vulkan.hpp>
 
 #include <vector>
-#include <vulkan/vulkan.hpp>
 
 class FVulkanDevice;
 

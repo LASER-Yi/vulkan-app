@@ -8,6 +8,7 @@
 #include "VulkanRHI/VulkanShader.h"
 #include "VulkanRHI/VulkanSwapChain.h"
 
+#include <array>
 #include <cassert>
 #include <cstddef>
 #include <limits>
@@ -15,7 +16,7 @@
 #include <vector>
 #include <vulkan/vulkan.hpp>
 
-FVulkanDevice::FVulkanDevice(VkDevice device, FVulkanGpu* physicalDevice)
+FVulkanDevice::FVulkanDevice(vk::Device device, FVulkanGpu* physicalDevice)
     : physicalDevice(physicalDevice), device(device)
 {
     InitRenderPass();
@@ -31,26 +32,26 @@ FVulkanDevice::FVulkanDevice(VkDevice device, FVulkanGpu* physicalDevice)
 
 FVulkanDevice::~FVulkanDevice()
 {
-    vkDestroyFence(device, inRenderFence, nullptr);
+    device.destroyFence(inRenderFence);
 
-    vkDestroyCommandPool(device, commandPool, nullptr);
+    device.destroyCommandPool(commandPool);
 
-    vkDestroyPipeline(device, graphicsPipeline, nullptr);
-    vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+    device.destroyPipeline(graphicsPipeline);
+    device.destroyPipelineLayout(pipelineLayout);
 
     swapChain.reset();
 
-    vkDestroyRenderPass(device, renderPass, nullptr);
+    device.destroyRenderPass(renderPass);
 
     shaders.clear();
 
-    vkDestroyDevice(device, nullptr);
+    device.destroy();
     device = VK_NULL_HANDLE;
 }
 
 std::shared_ptr<FVulkanShader>
 FVulkanDevice::CreateShader(const std::string& filename,
-                            VkShaderStageFlagBits stage)
+                            vk::ShaderStageFlagBits stage)
 {
     const FileBlob blob = FileManager::ReadFile(filename);
 
@@ -61,29 +62,29 @@ FVulkanDevice::CreateShader(const std::string& filename,
     return _shader;
 }
 
-void FVulkanDevice::Render(VkCommandBuffer commandBuffer)
+void FVulkanDevice::Render(vk::CommandBuffer* commandBuffer)
 {
-    VkCommandBufferBeginInfo beginInfo = {};
-    ZeroVulkanStruct(beginInfo, VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO);
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = 0;
-    beginInfo.pInheritanceInfo = nullptr;
+    const vk::CommandBufferBeginInfo beginInfo = {
+        .sType = vk::StructureType::eCommandBufferBeginInfo,
+        .flags = {},
+        .pInheritanceInfo = nullptr};
 
-    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
-        throw std::runtime_error("failed to begin recording command buffer!");
-    }
+    VERIFY_VULKAN_RESULT(commandBuffer->begin(&beginInfo))
 
-    VkRenderPassBeginInfo renderPassInfo = {};
-    ZeroVulkanStruct(renderPassInfo, VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO);
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = renderPass;
-    renderPassInfo.framebuffer = swapChain->GetFrameBuffer();
-    renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.renderArea.extent = swapChain->GetExtent();
+    const std::array<float, 4> defaultClearColor = {0.0f, 0.0f, 0.0f, 1.0f};
+    vk::ClearValue clearValue = {.color = defaultClearColor};
 
-    VkClearValue clearColor = {0.0f, 0.0f, 0.0f, 1.0f};
-    renderPassInfo.clearValueCount = 1;
-    renderPassInfo.pClearValues = &clearColor;
+    const std::vector<vk::ClearValue> clearColors = {
+        {.color = {.float32 = {}}}};
+
+    const vk::RenderPassBeginInfo renderPassInfo = {
+        .sType = vk::StructureType::eRenderPassBeginInfo,
+        .renderPass = renderPass,
+        .framebuffer = swapChain->GetFrameBuffer(),
+        .renderArea = {.offset = {0, 0}, .extent = swapChain->GetExtent()},
+        .clearValueCount = static_cast<uint32_t>(clearColors.size()),
+        .pClearValues = clearColors.data(),
+    };
 
     // VK_SUBPASS_CONTENTS_INLINE render pass will be embedded in the primary
     // command buffer
@@ -91,117 +92,103 @@ void FVulkanDevice::Render(VkCommandBuffer commandBuffer)
     // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS render pass will be
     // executed from secondary command buffer
 
-    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo,
-                         VK_SUBPASS_CONTENTS_INLINE);
+    commandBuffer->beginRenderPass(&renderPassInfo,
+                                   vk::SubpassContents::eInline);
 
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                      graphicsPipeline);
+    commandBuffer->bindPipeline(vk::PipelineBindPoint::eGraphics,
+                                graphicsPipeline);
 
-    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+    commandBuffer->setViewport(0, {viewport});
+    commandBuffer->setScissor(0, {scissor});
 
     // DRAW!
-    vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+    commandBuffer->draw(3, 1, 0, 0);
 
-    vkCmdEndRenderPass(commandBuffer);
+    commandBuffer->endRenderPass();
 
-    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-        throw std::runtime_error("failed to record command buffer!");
-    }
+    commandBuffer->end();
 }
 
-void FVulkanDevice::Submit(VkCommandBuffer commandBuffer)
+void FVulkanDevice::Submit(vk::CommandBuffer* commandBuffer)
 {
-    VkSubmitInfo submitInfo = {};
-    ZeroVulkanStruct(submitInfo, VK_STRUCTURE_TYPE_SUBMIT_INFO);
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-    const VkSemaphore waitSemaphores[] = {
+    const std::vector<vk::Semaphore> waitSemaphores = {
         GetSwapChain()->GetImageAvailableSemaphore()};
 
-    submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = waitSemaphores;
-
-    const VkPipelineStageFlags waitStages[] = {
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-    submitInfo.pWaitDstStageMask = waitStages;
-
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
-
-    const VkSemaphore signalSemaphores[] = {
+    const std::vector<vk::Semaphore> signalSemaphores = {
         GetSwapChain()->GetRenderFinishedSemaphore()};
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = signalSemaphores;
 
-    const VkQueue graphicsQueue = GetGraphicsQueue();
-    if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inRenderFence) !=
-        VK_SUCCESS) {
-        throw std::runtime_error("Failed to submit draw command buffer!");
-    }
+    const vk::PipelineStageFlags pipelineFlags = {
+        vk::PipelineStageFlagBits::eColorAttachmentOutput};
+
+    const vk::SubmitInfo submitInfo = {
+        .sType = vk::StructureType::eSubmitInfo,
+        .waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size()),
+        .pWaitSemaphores = waitSemaphores.data(),
+        .pWaitDstStageMask = &pipelineFlags,
+        .pCommandBuffers = commandBuffer,
+        .signalSemaphoreCount = static_cast<uint32_t>(signalSemaphores.size()),
+        .pSignalSemaphores = signalSemaphores.data()};
+
+    vk::Queue* graphicsQueue = GetGraphicsQueue();
+
+    graphicsQueue->submit({submitInfo}, inRenderFence);
 }
 
 void FVulkanDevice::InitSwapChain()
 {
-    assert(device != VK_NULL_HANDLE);
-
     swapChain = std::make_unique<FVulkanSwapChain>(this);
 }
 
 void FVulkanDevice::InitDeviceQueue()
 {
-    assert(device != VK_NULL_HANDLE);
-
     const auto indices = physicalDevice->GetQueueFamilies();
 
-    vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
-    vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
+    graphicsQueue = device.getQueue(indices.graphicsFamily.value(), 0);
+    presentQueue = device.getQueue(indices.presentFamily.value(), 0);
 }
 
 void FVulkanDevice::InitPipeline()
 {
-    auto VertShader =
-        CreateShader("shaders/triangle.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-    auto FragShader =
-        CreateShader("shaders/triangle.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+    auto VertShader = CreateShader("shaders/triangle.vert.spv",
+                                   vk::ShaderStageFlagBits::eVertex);
+    auto FragShader = CreateShader("shaders/triangle.frag.spv",
+                                   vk::ShaderStageFlagBits::eFragment);
 
-    VkPipelineShaderStageCreateInfo shaderStages[] = {
+    const vk::PipelineShaderStageCreateInfo shaderStages[] = {
         VertShader->CreatePipelineStage(), FragShader->CreatePipelineStage()};
 
     // Dynamic state
-    const std::vector<VkDynamicState> dynamicStates = {
-        VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+    const std::vector<vk::DynamicState> dynamicStates = {
+        vk::DynamicState::eViewport, vk::DynamicState::eScissor};
 
-    VkPipelineDynamicStateCreateInfo dynamicStateInfo = {};
-    ZeroVulkanStruct(dynamicStateInfo,
-                     VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO);
-    dynamicStateInfo.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-    dynamicStateInfo.dynamicStateCount = dynamicStates.size();
-    dynamicStateInfo.pDynamicStates = dynamicStates.data();
+    const vk::PipelineDynamicStateCreateInfo dynamicStateInfo = {
+        .sType = vk::StructureType::ePipelineDynamicStateCreateInfo,
+        .dynamicStateCount = static_cast<uint32_t>(dynamicStates.size()),
+        .pDynamicStates = dynamicStates.data(),
+    };
 
     // Vertex input
-    VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
-    ZeroVulkanStruct(vertexInputInfo,
-                     VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO);
-    vertexInputInfo.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputInfo.vertexBindingDescriptionCount = 0;
-    vertexInputInfo.vertexAttributeDescriptionCount = 0;
+    const vk::PipelineVertexInputStateCreateInfo vertexInputInfo = {
+        .sType = vk::StructureType::ePipelineVertexInputStateCreateInfo,
+        .vertexBindingDescriptionCount = 0,
+        .pVertexBindingDescriptions = nullptr,
+        .vertexAttributeDescriptionCount = 0,
+        .pVertexAttributeDescriptions = nullptr,
+    };
 
     // Input assembly
-    VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo = {};
-    inputAssemblyInfo.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssemblyInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    inputAssemblyInfo.primitiveRestartEnable = VK_FALSE;
+    const vk::PipelineInputAssemblyStateCreateInfo inputAssemblyInfo = {
+        .sType = vk::StructureType::ePipelineInputAssemblyStateCreateInfo,
+        .topology = vk::PrimitiveTopology::eTriangleList,
+        .primitiveRestartEnable = VK_FALSE,
+    };
 
     // Viewports
     const FSwapChainSupportDetails swapChainDetails =
         physicalDevice->GetSwapChainSupportDetails();
 
     // TODO: Improve API
-    const VkExtent2D extent = swapChainDetails.GetRequiredExtent(nullptr);
+    const vk::Extent2D extent = swapChainDetails.GetRequiredExtent(nullptr);
 
     viewport.x = 0.0f;
     viewport.y = 0.0f;
@@ -210,129 +197,101 @@ void FVulkanDevice::InitPipeline()
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
-    scissor.offset = {0, 0};
+    scissor.offset.x = 0.0f;
+    scissor.offset.y = 0.0f;
     scissor.extent = extent;
 
-    VkPipelineViewportStateCreateInfo viewportState = {};
-    ZeroVulkanStruct(viewportState,
-                     VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO);
-    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    viewportState.viewportCount = 1;
-    viewportState.pViewports = &viewport;
-    viewportState.scissorCount = 1;
-    viewportState.pScissors = &scissor;
+    const vk::PipelineViewportStateCreateInfo viewportState = {
+        .sType = vk::StructureType::ePipelineViewportStateCreateInfo,
+        .viewportCount = 1,
+        .pViewports = &viewport,
+        .scissorCount = 1,
+        .pScissors = &scissor};
 
     // Rasterizer
-    VkPipelineRasterizationStateCreateInfo rasterizer = {};
-    ZeroVulkanStruct(
-        rasterizer, VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO);
-    rasterizer.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizer.depthClampEnable = VK_FALSE;
-    rasterizer.rasterizerDiscardEnable = VK_FALSE;
-    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterizer.lineWidth = 1.0f;
-
-    // Rasterizer: Culling
-    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
-
-    // Rasterizer: Depth Bias
-    rasterizer.depthBiasEnable = VK_FALSE;
-    rasterizer.depthBiasConstantFactor = 0.0f;
-    rasterizer.depthBiasClamp = 0.0f;
-    rasterizer.depthBiasSlopeFactor = 0.0f;
+    const vk::PipelineRasterizationStateCreateInfo rasterizer = {
+        .sType = vk::StructureType::ePipelineRasterizationStateCreateInfo,
+        .depthClampEnable = VK_FALSE,
+        .rasterizerDiscardEnable = VK_FALSE,
+        .polygonMode = vk::PolygonMode::eFill,
+        .lineWidth = 1.0f,
+        .cullMode = vk::CullModeFlagBits::eBack,
+        .frontFace = vk::FrontFace::eClockwise,
+        .depthBiasEnable = VK_FALSE,
+        .depthBiasConstantFactor = 0.0f,
+        .depthBiasClamp = 0.0f,
+        .depthBiasSlopeFactor = 0.0f};
 
     // Multisampling (required GPU feature)
-    VkPipelineMultisampleStateCreateInfo multisampling = {};
-    ZeroVulkanStruct(multisampling,
-                     VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO);
-    multisampling.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisampling.sampleShadingEnable = VK_FALSE;
-    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-    multisampling.minSampleShading = 1.0f;
-    multisampling.pSampleMask = nullptr;
-    multisampling.alphaToCoverageEnable = VK_FALSE;
-    multisampling.alphaToOneEnable = VK_FALSE;
+    const vk::PipelineMultisampleStateCreateInfo multisamplingInfo = {
+        .sType = vk::StructureType::ePipelineMultisampleStateCreateInfo,
+        .sampleShadingEnable = VK_FALSE,
+        .rasterizationSamples = vk::SampleCountFlagBits::e1,
+        .minSampleShading = 1.0f,
+        .pSampleMask = nullptr,
+        .alphaToCoverageEnable = VK_FALSE,
+        .alphaToOneEnable = VK_FALSE};
 
     // Depth and stencil testing
     // TODO
 
     // Color blending
-    VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
-    colorBlendAttachment.colorWriteMask =
-        VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-        VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    colorBlendAttachment.blendEnable = VK_FALSE;
-    colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-    colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
-    colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-    colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-    colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-    colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+    const vk::PipelineColorBlendAttachmentState colorBlendAttachment = {
+        .colorWriteMask =
+            vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+            vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
+        .blendEnable = VK_FALSE,
+        .srcColorBlendFactor = vk::BlendFactor::eOne,
+        .dstColorBlendFactor = vk::BlendFactor::eZero,
+        .colorBlendOp = vk::BlendOp::eAdd,
+        .srcAlphaBlendFactor = vk::BlendFactor::eOne,
+        .dstAlphaBlendFactor = vk::BlendFactor::eZero,
+        .alphaBlendOp = vk::BlendOp::eAdd};
 
-    VkPipelineColorBlendStateCreateInfo colorBlending = {};
-    ZeroVulkanStruct(colorBlending,
-                     VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO);
-    colorBlending.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    colorBlending.logicOpEnable = VK_FALSE;
-    colorBlending.logicOp = VK_LOGIC_OP_COPY;
-    colorBlending.attachmentCount = 1;
-    colorBlending.pAttachments = &colorBlendAttachment;
-    colorBlending.blendConstants[0] = 0.0f;
-    colorBlending.blendConstants[1] = 0.0f;
-    colorBlending.blendConstants[2] = 0.0f;
-    colorBlending.blendConstants[3] = 0.0f;
+    const std::array<float, 4> defaultBlendConstants = {0.0f, 0.0f, 0.0f, 0.0f};
 
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
-    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 0;
-    pipelineLayoutInfo.pSetLayouts = nullptr;
-    pipelineLayoutInfo.pushConstantRangeCount = 0;
-    pipelineLayoutInfo.pPushConstantRanges = nullptr;
+    const vk::PipelineColorBlendStateCreateInfo colorBlending = {
+        .sType = vk::StructureType::ePipelineColorBlendStateCreateInfo,
+        .logicOpEnable = VK_FALSE,
+        .logicOp = vk::LogicOp::eCopy,
+        .attachmentCount = 1,
+        .pAttachments = &colorBlendAttachment,
+        .blendConstants = defaultBlendConstants};
 
-    const VkResult CreatePipelineResult = vkCreatePipelineLayout(
-        device, &pipelineLayoutInfo, nullptr, &pipelineLayout);
+    const vk::PipelineLayoutCreateInfo pipelineLayoutInfo = {
+        .sType = vk::StructureType::ePipelineLayoutCreateInfo,
+        .setLayoutCount = 0,
+        .pSetLayouts = nullptr,
+        .pushConstantRangeCount = 0,
+        .pPushConstantRanges = nullptr,
+    };
 
-    if (CreatePipelineResult != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create pipeline layout");
-    }
+    VERIFY_VULKAN_RESULT(device.createPipelineLayout(&pipelineLayoutInfo,
+                                                     nullptr, &pipelineLayout));
 
-    VkGraphicsPipelineCreateInfo pipelineInfo = {};
-    ZeroVulkanStruct(pipelineInfo,
-                     VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO);
-    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.stageCount = 2;
-    pipelineInfo.pStages = shaderStages;
+    const vk::GraphicsPipelineCreateInfo pipelineInfo = {
+        .sType = vk::StructureType::eGraphicsPipelineCreateInfo,
+        .stageCount = 2,
+        .pStages = shaderStages,
+        .pVertexInputState = &vertexInputInfo,
+        .pInputAssemblyState = &inputAssemblyInfo,
+        .pViewportState = &viewportState,
+        .pRasterizationState = &rasterizer,
+        .pMultisampleState = &multisamplingInfo,
+        .pDepthStencilState = nullptr,
+        .pColorBlendState = &colorBlending,
+        .pDynamicState = &dynamicStateInfo,
+        .layout = pipelineLayout,
+        .renderPass = renderPass,
+        .subpass = 0,
+        .basePipelineHandle = nullptr,
+        .basePipelineIndex = 0};
 
-    // referencing shader stages
-    pipelineInfo.pVertexInputState = &vertexInputInfo;
-    pipelineInfo.pInputAssemblyState = &inputAssemblyInfo;
-    pipelineInfo.pViewportState = &viewportState;
-    pipelineInfo.pRasterizationState = &rasterizer;
-    pipelineInfo.pMultisampleState = &multisampling;
-    pipelineInfo.pDepthStencilState = nullptr;
-    pipelineInfo.pColorBlendState = &colorBlending;
-    pipelineInfo.pDynamicState = &dynamicStateInfo;
+    const auto pipelines = VERIFY_VULKAN_RESULT_VALUE(
+        device.createGraphicsPipelines(nullptr, {pipelineInfo}, nullptr));
 
-    // referencing pipeline layout
-    pipelineInfo.layout = pipelineLayout;
-
-    // render pass
-    pipelineInfo.renderPass = renderPass;
-    pipelineInfo.subpass = 0;
-
-    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
-    pipelineInfo.basePipelineIndex = 0;
-
-    const VkResult CreateGraphicsPipelineResult = vkCreateGraphicsPipelines(
-        device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline);
-
-    if (CreateGraphicsPipelineResult != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create graphics pipeline");
-    }
+    assert(pipelines.size() == 1);
+    graphicsPipeline = pipelines[0];
 }
 
 void FVulkanDevice::InitRenderPass()
@@ -341,97 +300,80 @@ void FVulkanDevice::InitRenderPass()
         physicalDevice->GetSwapChainSupportDetails();
 
     // Attachment description
-    VkAttachmentDescription colorAttachment = {};
-    colorAttachment.format = swapChainDetails.GetRequiredSurfaceFormat().format;
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-
-    // Before rendering
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    // After rendering
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-
-    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    const vk::AttachmentDescription colorAttachment = {
+        .format = swapChainDetails.GetRequiredSurfaceFormat().format,
+        .samples = vk::SampleCountFlagBits::e1,
+        .loadOp = vk::AttachmentLoadOp::eClear,
+        .storeOp = vk::AttachmentStoreOp::eStore,
+        .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+        .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+        .initialLayout = vk::ImageLayout::eUndefined,
+        .finalLayout = vk::ImageLayout::ePresentSrcKHR};
 
     // Attachment reference
-    VkAttachmentReference colorAttachmentRef = {};
-    colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    const vk::AttachmentReference colorAttachmentRef = {
+        .attachment = 0, .layout = vk::ImageLayout::eColorAttachmentOptimal};
 
     // Subpass description
-    VkSubpassDescription subpass = {};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorAttachmentRef;
-
-    // Render pass
-    VkRenderPassCreateInfo renderPassInfo = {};
-    ZeroVulkanStruct(renderPassInfo, VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO);
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = 1;
-    renderPassInfo.pAttachments = &colorAttachment;
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpass;
+    const vk::SubpassDescription subpass = {
+        .pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
+        .colorAttachmentCount = 1,
+        .pColorAttachments = &colorAttachmentRef};
 
     // Subpass dependency
-    VkSubpassDependency dependency = {};
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass = 0;
+    const vk::SubpassDependency dependency = {
+        .srcSubpass = VK_SUBPASS_EXTERNAL,
+        .dstSubpass = 0,
+        .srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+        .srcAccessMask = vk::AccessFlagBits::eMemoryRead,
+        .dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+        .dstAccessMask = vk::AccessFlagBits::eColorAttachmentRead |
+                         vk::AccessFlagBits::eColorAttachmentWrite};
 
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.srcAccessMask = 0;
+    // Render pass
+    const vk::RenderPassCreateInfo renderPassInfo = {
+        .sType = vk::StructureType::eRenderPassCreateInfo,
+        .attachmentCount = 1,
+        .pAttachments = &colorAttachment,
+        .subpassCount = 1,
+        .pSubpasses = &subpass,
+        .dependencyCount = 1,
+        .pDependencies = &dependency};
 
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-    renderPassInfo.dependencyCount = 1;
-    renderPassInfo.pDependencies = &dependency;
-
-    const VkResult CreateRenderPassResult =
-        vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass);
-
-    if (CreateRenderPassResult != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create render pass");
-    }
+    VERIFY_VULKAN_RESULT(
+        device.createRenderPass(&renderPassInfo, nullptr, &renderPass));
 }
 
 void FVulkanDevice::InitCommandPool()
 {
     const auto indices = physicalDevice->GetQueueFamilies();
 
-    VkCommandPoolCreateInfo commandPoolInfo = {};
-    ZeroVulkanStruct(commandPoolInfo,
-                     VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO);
-    commandPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    commandPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    commandPoolInfo.queueFamilyIndex = indices.graphicsFamily.value();
+    const vk::CommandPoolCreateInfo commandPoolInfo = {
+        .sType = vk::StructureType::eCommandPoolCreateInfo,
+        .queueFamilyIndex = indices.graphicsFamily.value(),
+        .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer};
 
-    const VkResult CreateCommandPoolResult =
-        vkCreateCommandPool(device, &commandPoolInfo, nullptr, &commandPool);
-
-    if (CreateCommandPoolResult != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create command pool");
-    }
+    VERIFY_VULKAN_RESULT(
+        device.createCommandPool(&commandPoolInfo, nullptr, &commandPool));
 }
 
 void FVulkanDevice::BeginNextFrame()
 {
-    vkWaitForFences(device, 1, &inRenderFence, VK_TRUE,
-                    std::numeric_limits<uint64_t>::max());
-    vkResetFences(device, 1, &inRenderFence);
+    VERIFY_VULKAN_RESULT(device.waitForFences(
+        {inRenderFence}, VK_TRUE, std::numeric_limits<uint64_t>::max()));
+
+    device.resetFences({inRenderFence});
 
     GetSwapChain()->AcquireNextImage();
 }
 
-VkCommandBuffer FVulkanDevice::CreateCommandBuffer()
+vk::CommandBuffer FVulkanDevice::CreateCommandBuffer()
 {
-    VkCommandBufferAllocateInfo allocInfo = {};
-    ZeroVulkanStruct(allocInfo, VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO);
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.commandPool = commandPool;
+    const vk::CommandBufferAllocateInfo allocInfo = {
+        .sType = vk::StructureType::eCommandBufferAllocateInfo,
+        .commandPool = commandPool,
+        .level = vk::CommandBufferLevel::ePrimary,
+        .commandBufferCount = 1};
 
     // VK_COMMAND_BUFFER_LEVEL_PRIMARY means that the command buffer can be
     // submitted directly
@@ -440,31 +382,21 @@ VkCommandBuffer FVulkanDevice::CreateCommandBuffer()
     // command buffer can not by submitted directly, but can be called from
     // primary command buffers
 
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandBufferCount = 1;
+    std::vector<vk::CommandBuffer> commandBuffers =
+        device.allocateCommandBuffers({allocInfo});
 
-    VkCommandBuffer commandBuffer;
-    const VkResult AllocateCommandBufferResult =
-        vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
+    assert(commandBuffers.size() == 1);
 
-    if (AllocateCommandBufferResult != VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate command buffer");
-    }
-
-    return commandBuffer;
+    return commandBuffers[0];
 }
 
 void FVulkanDevice::InitFences()
 {
-    VkFenceCreateInfo fenceInfo = {};
-    ZeroVulkanStruct(fenceInfo, VK_STRUCTURE_TYPE_FENCE_CREATE_INFO);
-    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    const vk::FenceCreateInfo fenceInfo = {
+        .sType = vk::StructureType::eFenceCreateInfo,
+        .flags = vk::FenceCreateFlagBits::eSignaled};
 
     // VK_FENCE_CREATE_SIGNALED_BIT means that the fence is initially signaled
-    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-    if (vkCreateFence(device, &fenceInfo, nullptr, &inRenderFence) !=
-        VK_SUCCESS) {
-        throw std::runtime_error("Failed to create fence");
-    }
+    inRenderFence = device.createFence({fenceInfo});
 }

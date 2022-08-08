@@ -7,8 +7,6 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include <vulkan/vulkan_handles.hpp>
-#include <vulkan/vulkan_structs.hpp>
 
 class FVulkanGpu;
 class FVulkanShader;
@@ -23,10 +21,10 @@ class FVulkanDevice
     std::shared_ptr<FVulkanShader> CreateShader(const std::string& filename,
                                                 vk::ShaderStageFlagBits stage);
 
-    vk::Queue GetGraphicsQueue() const { return graphicsQueue; }
-    vk::Queue GetPresentQueue() const { return presentQueue; }
+    vk::Queue* GetGraphicsQueue() { return &graphicsQueue; }
+    vk::Queue* GetPresentQueue() { return &presentQueue; }
 
-    vk::Device GetDevice() const { return device; }
+    vk::Device& GetDevice() { return device; }
 
     FVulkanGpu* GetPhysicalDevice() const { return physicalDevice; }
 
@@ -38,8 +36,8 @@ class FVulkanDevice
 
     vk::CommandBuffer CreateCommandBuffer();
 
-    void Render(vk::CommandBuffer commandBuffer);
-    void Submit(vk::CommandBuffer commandBuffer);
+    void Render(vk::CommandBuffer* commandBuffer);
+    void Submit(vk::CommandBuffer* commandBuffer);
 
   protected:
     FVulkanGpu* physicalDevice;

@@ -3,7 +3,6 @@
 #include <memory>
 #include <vector>
 #include <vulkan/vulkan.hpp>
-#include <vulkan/vulkan_handles.hpp>
 
 #include "GLFW/glfw3.h"
 #include "VulkanRHI/VulkanGPU.h"
@@ -20,13 +19,15 @@ class FVulkanInstance
     static std::vector<const char*> validationLayers;
 
   public:
-    std::vector<std::unique_ptr<FVulkanGpu>> GetGPUs() const;
+    std::vector<std::unique_ptr<FVulkanGpu>> GetGPUs();
 
     FVulkanGpu* GetPhysicalDevice() const { return device.get(); }
 
+    vk::SurfaceKHR GetSurface() const { return surface; }
+
   protected:
-    vk::Instance* instance;
-    vk::SurfaceKHR* surface;
+    vk::Instance instance;
+    vk::SurfaceKHR surface;
     std::unique_ptr<FVulkanGpu> device;
 
     std::vector<const char*> enabledLayers;

@@ -6,9 +6,6 @@
 #include <string>
 #include <vector>
 #include <vulkan/vulkan.hpp>
-#include <vulkan/vulkan_enums.hpp>
-#include <vulkan/vulkan_handles.hpp>
-#include <vulkan/vulkan_structs.hpp>
 
 #include "Definition.h"
 #include "GLFW/glfw3.h"
@@ -33,17 +30,13 @@ FVulkanInstance::~FVulkanInstance()
 {
     device = nullptr;
 
-    instance->destroy();
-    instance = nullptr;
+    instance.destroy();
 }
 
-std::vector<std::unique_ptr<FVulkanGpu>> FVulkanInstance::GetGPUs() const
+std::vector<std::unique_ptr<FVulkanGpu>> FVulkanInstance::GetGPUs()
 {
-    assert(instance != VK_NULL_HANDLE);
-    assert(surface != VK_NULL_HANDLE);
-
     std::vector<vk::PhysicalDevice> devices =
-        instance->enumeratePhysicalDevices();
+        instance.enumeratePhysicalDevices();
 
     if (devices.size() == 0) {
         throw std::runtime_error("Failed to find GPUs with Vulkan support!");
@@ -53,7 +46,7 @@ std::vector<std::unique_ptr<FVulkanGpu>> FVulkanInstance::GetGPUs() const
     gpus.reserve(devices.size());
     for (auto& device : devices) {
         gpus.emplace_back(
-            std::make_unique<FVulkanGpu>(device, surface, enabledLayers));
+            std::make_unique<FVulkanGpu>(device, this, enabledLayers));
     }
 
     return std::move(gpus);
@@ -89,7 +82,6 @@ bool FVulkanInstance::SupportValidationLayer() const
 
 void FVulkanInstance::SelectGPU()
 {
-    assert(instance != nullptr);
     auto gpus = GetGPUs();
 
     // Simplest solution
@@ -130,7 +122,7 @@ void FVulkanInstance::CreateInstance()
 
 #if BUILD_DEBUG
     std::cout << "Available extensions:" << std::endl;
-    for (const VkExtensionProperties& extension : extensions) {
+    for (const vk::ExtensionProperties& extension : extensions) {
         std::cout << "\t" << extension.extensionName << std::endl;
     }
 #endif
@@ -159,7 +151,7 @@ void FVulkanInstance::CreateInstance()
 
 // Workaround for VK_ERROR_INCOMPATIBLE_DRIVER
 #if WITH_MOLTEN_VK
-    createInfo.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+    createInfo.flags = vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
     enabledExtensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
     enabledExtensions.push_back(
         VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
@@ -171,14 +163,14 @@ void FVulkanInstance::CreateInstance()
     createInfo.enabledLayerCount = enabledLayers.size();
     createInfo.ppEnabledLayerNames = enabledLayers.data();
 
-    VERIFY_VULKAN_RESULT(vk::createInstance(&createInfo, nullptr, instance));
+    VERIFY_VULKAN_RESULT(vk::createInstance(&createInfo, nullptr, &instance));
 }
 
 void FVulkanInstance::CreateSurface(GLFWwindow* window)
 {
     VkSurfaceKHR c_surface;
-    VERIFY_VULKAN_RESULT_C(
-        glfwCreateWindowSurface(*instance, window, nullptr, &c_surface));
+    const VkResult Result =
+        glfwCreateWindowSurface(instance, window, nullptr, &c_surface);
 
-    surface = new vk::SurfaceKHR(c_surface);
+    surface = c_surface;
 }

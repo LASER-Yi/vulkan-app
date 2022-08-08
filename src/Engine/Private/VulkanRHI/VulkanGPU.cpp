@@ -24,9 +24,9 @@
 const std::vector<const char*> requiredExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
-FVulkanGpu::FVulkanGpu(VkPhysicalDevice device, VkSurfaceKHR surface,
+FVulkanGpu::FVulkanGpu(vk::PhysicalDevice device, FVulkanInstance* instance,
                        const std::vector<const char*>& layers)
-    : device(device), surface(surface), layers(layers)
+    : device(device), instance(instance), layers(layers)
 {
 }
 
@@ -41,24 +41,20 @@ FQueueFamilyIndices FVulkanGpu::GetQueueFamilies() const
 {
     FQueueFamilyIndices indices;
 
-    uint32_t queueFamilyCount = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount,
-                                             nullptr);
+    const auto queueFamilies = device.getQueueFamilyProperties();
 
-    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount,
-                                             queueFamilies.data());
+    vk::SurfaceKHR surface = instance->GetSurface();
 
     int i = 0;
-    for (const VkQueueFamilyProperties& properties : queueFamilies) {
-        if (properties.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+    for (const vk::QueueFamilyProperties& properties : queueFamilies) {
+        if (properties.queueFlags & vk::QueueFlagBits::eGraphics) {
             indices.graphicsFamily = i;
         }
 
         VkBool32 presentSupport = VK_FALSE;
 
-        vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface,
-                                             &presentSupport);
+        VERIFY_VULKAN_RESULT(
+            device.getSurfaceSupportKHR(i, surface, &presentSupport));
 
         if (presentSupport) {
             indices.presentFamily = i;
@@ -70,33 +66,19 @@ FQueueFamilyIndices FVulkanGpu::GetQueueFamilies() const
     return indices;
 }
 
-const VkPhysicalDeviceProperties FVulkanGpu::GetProperties() const
+const vk::PhysicalDeviceProperties FVulkanGpu::GetProperties() const
 {
-    VkPhysicalDeviceProperties properties;
-    vkGetPhysicalDeviceProperties(device, &properties);
-
-    return std::move(properties);
+    return device.getProperties();
 }
 
-const VkPhysicalDeviceFeatures FVulkanGpu::GetFeatures() const
+const vk::PhysicalDeviceFeatures FVulkanGpu::GetFeatures() const
 {
-    VkPhysicalDeviceFeatures features;
-    vkGetPhysicalDeviceFeatures(device, &features);
-
-    return std::move(features);
+    return device.getFeatures();
 }
 
-std::vector<VkExtensionProperties> FVulkanGpu::GetExtensions() const
+std::vector<vk::ExtensionProperties> FVulkanGpu::GetExtensions() const
 {
-    uint32_t extensionCount = 0;
-    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount,
-                                         nullptr);
-
-    std::vector<VkExtensionProperties> extensions(extensionCount);
-    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount,
-                                         extensions.data());
-
-    return std::move(extensions);
+    return device.enumerateDeviceExtensionProperties();
 }
 
 bool FVulkanGpu::IsValid() const
@@ -106,7 +88,7 @@ bool FVulkanGpu::IsValid() const
     std::set<std::string> requiredExts(requiredExtensions.begin(),
                                        requiredExtensions.end());
 
-    for (const VkExtensionProperties& extensionProperties : extensions) {
+    for (const auto& extensionProperties : extensions) {
         requiredExts.erase(extensionProperties.extensionName);
     }
 
@@ -119,16 +101,16 @@ bool FVulkanGpu::IsValid() const
 
 uint32_t FVulkanGpu::GetScore() const
 {
-    const VkPhysicalDeviceProperties properties = GetProperties();
-    const VkPhysicalDeviceFeatures features = GetFeatures();
+    const auto properties = GetProperties();
+    const auto features = GetFeatures();
 
     uint32_t score = 0;
 
     switch (properties.deviceType) {
-    case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+    case vk::PhysicalDeviceType::eDiscreteGpu:
         score += 1000;
         break;
-    case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+    case vk::PhysicalDeviceType::eIntegratedGpu:
         score += 100;
         break;
     default:
@@ -140,7 +122,7 @@ uint32_t FVulkanGpu::GetScore() const
 
 void FVulkanGpu::InitLogicalDevice()
 {
-    std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+    std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
     const FQueueFamilyIndices indices = GetQueueFamilies();
 
     const std::set<uint32_t> uniqueQueueFamilies = {
@@ -148,26 +130,24 @@ void FVulkanGpu::InitLogicalDevice()
 
     constexpr float queuePriority = 1.0f;
     for (const uint32_t queueFamily : uniqueQueueFamilies) {
-        VkDeviceQueueCreateInfo queueCreateInfo = {};
-        ZeroVulkanStruct(queueCreateInfo,
-                         VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO);
-        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-        queueCreateInfo.queueFamilyIndex = queueFamily;
-        queueCreateInfo.queueCount = 1;
-        queueCreateInfo.pQueuePriorities = &queuePriority;
+        vk::DeviceQueueCreateInfo queueCreateInfo = {
+            .sType = vk::StructureType::eDeviceQueueCreateInfo,
+            .queueFamilyIndex = queueFamily,
+            .queueCount = 1,
+            .pQueuePriorities = &queuePriority,
+        };
+
         queueCreateInfos.push_back(queueCreateInfo);
     }
 
-    VkPhysicalDeviceFeatures deviceFeatures = {};
+    vk::PhysicalDeviceFeatures deviceFeatures = {};
 
-    VkDeviceCreateInfo createInfo = {};
-    ZeroVulkanStruct(createInfo, VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO);
-    createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-
-    createInfo.queueCreateInfoCount = queueCreateInfos.size();
-    createInfo.pQueueCreateInfos = queueCreateInfos.data();
-
-    createInfo.pEnabledFeatures = &deviceFeatures;
+    vk::DeviceCreateInfo createInfo = {
+        .sType = vk::StructureType::eDeviceCreateInfo,
+        .queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size()),
+        .pQueueCreateInfos = queueCreateInfos.data(),
+        .pEnabledFeatures = &deviceFeatures,
+    };
 
     if (GE_VALIDATION_LAYERS) {
         createInfo.enabledLayerCount = layers.size();
@@ -185,7 +165,7 @@ void FVulkanGpu::InitLogicalDevice()
     const auto extensions = GetExtensions();
 
     if (std::find_if(extensions.begin(), extensions.end(),
-                     [](const VkExtensionProperties& properties) {
+                     [](const vk::ExtensionProperties& properties) {
                          return strcmp(properties.extensionName,
                                        "VK_KHR_portability_subset");
                      }) != extensions.end()) {
@@ -196,18 +176,11 @@ void FVulkanGpu::InitLogicalDevice()
     createInfo.enabledExtensionCount = extensionNames.size();
     createInfo.ppEnabledExtensionNames = extensionNames.data();
 
-    VkDevice ld;
-    const VkResult CreateResult =
-        vkCreateDevice(device, &createInfo, nullptr, &ld);
+    vk::Device vk_device;
+    VERIFY_VULKAN_RESULT(device.createDevice(&createInfo, nullptr, &vk_device));
 
-    if (CreateResult != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create logical device!");
-    }
-
-    logicalDevice = std::make_unique<FVulkanDevice>(ld, this);
+    logicalDevice = std::make_unique<FVulkanDevice>(vk_device, this);
 }
-
-VkSurfaceKHR FVulkanGpu::GetSurface() const { return surface; }
 
 FVulkanDevice* FVulkanGpu::GetLogicalDevice() const
 {
@@ -218,5 +191,6 @@ FVulkanDevice* FVulkanGpu::GetLogicalDevice() const
 
 FSwapChainSupportDetails FVulkanGpu::GetSwapChainSupportDetails() const
 {
+    vk::SurfaceKHR surface = instance->GetSurface();
     return FSwapChainSupportDetails(device, surface);
 }

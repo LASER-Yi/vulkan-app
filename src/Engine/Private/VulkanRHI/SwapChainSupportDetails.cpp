@@ -1,4 +1,5 @@
 #include "VulkanRHI/SwapChainSupportDetails.h"
+
 #include "GLFW/glfw3.h"
 #include <algorithm>
 #include <cassert>
@@ -6,49 +7,34 @@
 #include <stdint.h>
 #include <vulkan/vulkan.hpp>
 
-FSwapChainSupportDetails::FSwapChainSupportDetails(
-    const VkPhysicalDevice device, const VkSurfaceKHR surface)
+#include "VulkanRHI/VulkanCommon.h"
+
+FSwapChainSupportDetails::FSwapChainSupportDetails(vk::PhysicalDevice device,
+                                                   vk::SurfaceKHR surface)
     : device(device), surface(surface)
 {
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &capabilities);
+    VERIFY_VULKAN_RESULT(
+        device.getSurfaceCapabilitiesKHR(surface, &capabilities));
 
     // Get the number of formats supported by the surface
-    {
-        uint32_t formatCount;
-        vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount,
-                                             nullptr);
-        if (formatCount != 0) {
-            formats.resize(formatCount);
-            vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount,
-                                                 formats.data());
-        }
-    }
+    formats = device.getSurfaceFormatsKHR(surface);
 
     // Get the number of present modes supported by the surface
-    {
-        uint32_t presentModeCount;
-        vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface,
-                                                  &presentModeCount, nullptr);
-        if (presentModeCount != 0) {
-            presentModes.resize(presentModeCount);
-            vkGetPhysicalDeviceSurfacePresentModesKHR(
-                device, surface, &presentModeCount, presentModes.data());
-        }
-    }
+    presentModes = device.getSurfacePresentModesKHR(surface);
 }
 
-VkSurfaceFormatKHR FSwapChainSupportDetails::GetRequiredSurfaceFormat() const
+vk::SurfaceFormatKHR FSwapChainSupportDetails::GetRequiredSurfaceFormat() const
 {
-    for (const VkSurfaceFormatKHR& format : formats) {
-        if (format.format == VK_FORMAT_B8G8R8A8_SRGB &&
-            format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+    for (const vk::SurfaceFormatKHR& format : formats) {
+        if (format.format == vk::Format::eR8G8B8A8Srgb &&
+            format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
             return format;
         }
     }
     return formats[0];
 }
 
-VkPresentModeKHR FSwapChainSupportDetails::GetRequiredPresentMode() const
+vk::PresentModeKHR FSwapChainSupportDetails::GetRequiredPresentMode() const
 {
     /*
         VK_PRESENT_MODE_IMMEDIATE_KHR: No buffer
@@ -59,12 +45,12 @@ VkPresentModeKHR FSwapChainSupportDetails::GetRequiredPresentMode() const
     bool HasTripleBuffer = false;
     bool HasDoubleBuffer = false;
 
-    for (const VkPresentModeKHR& mode : presentModes) {
+    for (const vk::PresentModeKHR& mode : presentModes) {
         switch (mode) {
-        case VK_PRESENT_MODE_MAILBOX_KHR:
+        case vk::PresentModeKHR::eMailbox:
             HasTripleBuffer = true;
             break;
-        case VK_PRESENT_MODE_FIFO_KHR:
+        case vk::PresentModeKHR::eFifo:
             HasDoubleBuffer = true;
             break;
         default:
@@ -73,15 +59,16 @@ VkPresentModeKHR FSwapChainSupportDetails::GetRequiredPresentMode() const
     }
 
     if (HasDoubleBuffer) {
-        return VK_PRESENT_MODE_FIFO_KHR;
+        return vk::PresentModeKHR::eFifo;
     } else if (HasTripleBuffer) {
-        return VK_PRESENT_MODE_MAILBOX_KHR;
+        return vk::PresentModeKHR::eMailbox;
     }
 
     return presentModes[0];
 }
 
-VkExtent2D FSwapChainSupportDetails::GetRequiredExtent(GLFWwindow* window) const
+vk::Extent2D
+FSwapChainSupportDetails::GetRequiredExtent(GLFWwindow* window) const
 {
     if (capabilities.currentExtent.width !=
         std::numeric_limits<uint32_t>::max()) {
@@ -91,8 +78,8 @@ VkExtent2D FSwapChainSupportDetails::GetRequiredExtent(GLFWwindow* window) const
         int width, height;
         glfwGetFramebufferSize(window, &width, &height);
 
-        VkExtent2D actualExtent = {static_cast<uint32_t>(width),
-                                   static_cast<uint32_t>(height)};
+        vk::Extent2D actualExtent = {.width = static_cast<uint32_t>(width),
+                                     .height = static_cast<uint32_t>(height)};
 
         actualExtent.width =
             std::clamp(actualExtent.width, capabilities.minImageExtent.width,
