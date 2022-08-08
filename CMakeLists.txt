@@ -23,6 +23,5 @@ include(AddressSanitizer)
 # GLFW3
 include(GLFW)
 
-# Projects
-add_subdirectory(Engine)
-add_subdirectory(app)
+# add subdirectories
+add_subdirectory(src)
