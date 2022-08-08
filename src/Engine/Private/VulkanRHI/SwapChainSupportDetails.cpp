@@ -26,7 +26,7 @@ FSwapChainSupportDetails::FSwapChainSupportDetails(vk::PhysicalDevice device,
 vk::SurfaceFormatKHR FSwapChainSupportDetails::GetRequiredSurfaceFormat() const
 {
     for (const vk::SurfaceFormatKHR& format : formats) {
-        if (format.format == vk::Format::eR8G8B8A8Srgb &&
+        if (format.format == vk::Format::eB8G8R8A8Srgb &&
             format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
             return format;
         }
@@ -74,6 +74,7 @@ FSwapChainSupportDetails::GetRequiredExtent(GLFWwindow* window) const
         std::numeric_limits<uint32_t>::max()) {
         return capabilities.currentExtent;
     } else {
+        // TODO
         assert(false);
         int width, height;
         glfwGetFramebufferSize(window, &width, &height);

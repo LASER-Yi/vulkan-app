@@ -17,7 +17,8 @@
 #include <vulkan/vulkan.hpp>
 
 FVulkanDevice::FVulkanDevice(vk::Device device, FVulkanGpu* physicalDevice)
-    : physicalDevice(physicalDevice), device(device)
+    : physicalDevice(physicalDevice), device(device),
+      swapChainDetails(physicalDevice->GetSwapChainSupportDetails())
 {
     InitRenderPass();
     InitPipeline();
@@ -112,22 +113,27 @@ void FVulkanDevice::Render(vk::CommandBuffer* commandBuffer)
 void FVulkanDevice::Submit(vk::CommandBuffer* commandBuffer)
 {
     const std::vector<vk::Semaphore> waitSemaphores = {
-        GetSwapChain()->GetImageAvailableSemaphore()};
+        GetSwapChain()->GetImageAvailableSemaphore(),
+    };
 
     const std::vector<vk::Semaphore> signalSemaphores = {
-        GetSwapChain()->GetRenderFinishedSemaphore()};
+        GetSwapChain()->GetRenderFinishedSemaphore(),
+    };
 
     const vk::PipelineStageFlags pipelineFlags = {
-        vk::PipelineStageFlagBits::eColorAttachmentOutput};
+        vk::PipelineStageFlagBits::eColorAttachmentOutput,
+    };
 
     const vk::SubmitInfo submitInfo = {
         .sType = vk::StructureType::eSubmitInfo,
+        .commandBufferCount = 1,
+        .pCommandBuffers = commandBuffer,
+        .pWaitDstStageMask = &pipelineFlags,
         .waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size()),
         .pWaitSemaphores = waitSemaphores.data(),
-        .pWaitDstStageMask = &pipelineFlags,
-        .pCommandBuffers = commandBuffer,
         .signalSemaphoreCount = static_cast<uint32_t>(signalSemaphores.size()),
-        .pSignalSemaphores = signalSemaphores.data()};
+        .pSignalSemaphores = signalSemaphores.data(),
+    };
 
     vk::Queue* graphicsQueue = GetGraphicsQueue();
 
@@ -183,10 +189,6 @@ void FVulkanDevice::InitPipeline()
         .primitiveRestartEnable = VK_FALSE,
     };
 
-    // Viewports
-    const FSwapChainSupportDetails swapChainDetails =
-        physicalDevice->GetSwapChainSupportDetails();
-
     // TODO: Improve API
     const vk::Extent2D extent = swapChainDetails.GetRequiredExtent(nullptr);
 
@@ -206,7 +208,8 @@ void FVulkanDevice::InitPipeline()
         .viewportCount = 1,
         .pViewports = &viewport,
         .scissorCount = 1,
-        .pScissors = &scissor};
+        .pScissors = &scissor,
+    };
 
     // Rasterizer
     const vk::PipelineRasterizationStateCreateInfo rasterizer = {
@@ -230,7 +233,8 @@ void FVulkanDevice::InitPipeline()
         .minSampleShading = 1.0f,
         .pSampleMask = nullptr,
         .alphaToCoverageEnable = VK_FALSE,
-        .alphaToOneEnable = VK_FALSE};
+        .alphaToOneEnable = VK_FALSE,
+    };
 
     // Depth and stencil testing
     // TODO
@@ -246,7 +250,8 @@ void FVulkanDevice::InitPipeline()
         .colorBlendOp = vk::BlendOp::eAdd,
         .srcAlphaBlendFactor = vk::BlendFactor::eOne,
         .dstAlphaBlendFactor = vk::BlendFactor::eZero,
-        .alphaBlendOp = vk::BlendOp::eAdd};
+        .alphaBlendOp = vk::BlendOp::eAdd,
+    };
 
     const std::array<float, 4> defaultBlendConstants = {0.0f, 0.0f, 0.0f, 0.0f};
 
@@ -256,7 +261,8 @@ void FVulkanDevice::InitPipeline()
         .logicOp = vk::LogicOp::eCopy,
         .attachmentCount = 1,
         .pAttachments = &colorBlendAttachment,
-        .blendConstants = defaultBlendConstants};
+        .blendConstants = defaultBlendConstants,
+    };
 
     const vk::PipelineLayoutCreateInfo pipelineLayoutInfo = {
         .sType = vk::StructureType::ePipelineLayoutCreateInfo,
@@ -285,7 +291,8 @@ void FVulkanDevice::InitPipeline()
         .renderPass = renderPass,
         .subpass = 0,
         .basePipelineHandle = nullptr,
-        .basePipelineIndex = 0};
+        .basePipelineIndex = 0,
+    };
 
     const auto pipelines = VERIFY_VULKAN_RESULT_VALUE(
         device.createGraphicsPipelines(nullptr, {pipelineInfo}, nullptr));
@@ -296,9 +303,6 @@ void FVulkanDevice::InitPipeline()
 
 void FVulkanDevice::InitRenderPass()
 {
-    const FSwapChainSupportDetails swapChainDetails =
-        physicalDevice->GetSwapChainSupportDetails();
-
     // Attachment description
     const vk::AttachmentDescription colorAttachment = {
         .format = swapChainDetails.GetRequiredSurfaceFormat().format,
@@ -308,27 +312,31 @@ void FVulkanDevice::InitRenderPass()
         .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
         .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
         .initialLayout = vk::ImageLayout::eUndefined,
-        .finalLayout = vk::ImageLayout::ePresentSrcKHR};
+        .finalLayout = vk::ImageLayout::ePresentSrcKHR,
+    };
 
     // Attachment reference
     const vk::AttachmentReference colorAttachmentRef = {
-        .attachment = 0, .layout = vk::ImageLayout::eColorAttachmentOptimal};
+        .attachment = 0,
+        .layout = vk::ImageLayout::eColorAttachmentOptimal,
+    };
 
     // Subpass description
     const vk::SubpassDescription subpass = {
         .pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
         .colorAttachmentCount = 1,
-        .pColorAttachments = &colorAttachmentRef};
+        .pColorAttachments = &colorAttachmentRef,
+    };
 
     // Subpass dependency
     const vk::SubpassDependency dependency = {
         .srcSubpass = VK_SUBPASS_EXTERNAL,
         .dstSubpass = 0,
+        .srcAccessMask = vk::AccessFlagBits::eNone,
         .srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
-        .srcAccessMask = vk::AccessFlagBits::eMemoryRead,
+        .dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite,
         .dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
-        .dstAccessMask = vk::AccessFlagBits::eColorAttachmentRead |
-                         vk::AccessFlagBits::eColorAttachmentWrite};
+    };
 
     // Render pass
     const vk::RenderPassCreateInfo renderPassInfo = {
@@ -338,7 +346,8 @@ void FVulkanDevice::InitRenderPass()
         .subpassCount = 1,
         .pSubpasses = &subpass,
         .dependencyCount = 1,
-        .pDependencies = &dependency};
+        .pDependencies = &dependency,
+    };
 
     VERIFY_VULKAN_RESULT(
         device.createRenderPass(&renderPassInfo, nullptr, &renderPass));

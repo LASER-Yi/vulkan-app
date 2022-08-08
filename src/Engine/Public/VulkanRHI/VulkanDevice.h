@@ -65,6 +65,9 @@ class FVulkanDevice
     vk::Fence inRenderFence;
 
   private:
+    FSwapChainSupportDetails swapChainDetails;
+
+  private:
     void InitSwapChain();
     void InitDeviceQueue();
     void InitPipeline();

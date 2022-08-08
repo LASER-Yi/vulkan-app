@@ -19,8 +19,8 @@ class FVulkanSwapChain
 
     vk::Framebuffer GetFrameBuffer() const;
 
-    uint32_t AcquireNextImage();
-    uint32_t GetCurrentImage() const { return cachedNextImage; };
+    void AcquireNextImage();
+    uint32_t GetCurrentImage() const { return CurrentIndex; };
 
     vk::Semaphore GetImageAvailableSemaphore() const
     {
@@ -49,7 +49,7 @@ class FVulkanSwapChain
 
     std::vector<vk::Framebuffer> frameBuffers;
 
-    uint32_t cachedNextImage;
+    int32_t CurrentIndex;
 
     bool bSwapchainNeedsResize;
 

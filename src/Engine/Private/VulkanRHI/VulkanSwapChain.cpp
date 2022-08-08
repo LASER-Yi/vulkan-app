@@ -1,4 +1,5 @@
 #include "VulkanRHI/VulkanSwapChain.h"
+#include "Definition.h"
 #include "VulkanRHI/VulkanCommon.h"
 #include "VulkanRHI/VulkanDevice.h"
 #include "VulkanRHI/VulkanGPU.h"
@@ -10,7 +11,7 @@
 #include <vector>
 
 FVulkanSwapChain::FVulkanSwapChain(FVulkanDevice* device)
-    : logicalDevice(device), swapChain(), cachedNextImage(0),
+    : logicalDevice(device), swapChain(), CurrentIndex(INDEX_NONE),
       bSwapchainNeedsResize(false)
 {
     CreateSwapChain();
@@ -106,10 +107,8 @@ void FVulkanSwapChain::CreateImageViews()
                 },
         };
 
-        vk::ImageView imageView =
-            vk_device.createImageView(createInfo, nullptr);
-
-        ImageViews[i] = imageView;
+        VERIFY_VULKAN_RESULT(
+            vk_device.createImageView(&createInfo, nullptr, &ImageViews[i]));
     }
 }
 
@@ -121,7 +120,7 @@ void FVulkanSwapChain::CreateFrameBuffers()
     auto vk_device = logicalDevice->GetDevice();
 
     for (size_t i = 0; i < size; i++) {
-        vk::ImageView attachments[] = {ImageViews[i]};
+        const vk::ImageView attachments[] = {ImageViews[i]};
 
         const vk::FramebufferCreateInfo createInfo = {
             .sType = vk::StructureType::eFramebufferCreateInfo,
@@ -140,8 +139,8 @@ void FVulkanSwapChain::CreateFrameBuffers()
 
 vk::Framebuffer FVulkanSwapChain::GetFrameBuffer() const
 {
-    assert(cachedNextImage < frameBuffers.size());
-    return frameBuffers[cachedNextImage];
+    assert(CurrentIndex < frameBuffers.size() && CurrentIndex != INDEX_NONE);
+    return frameBuffers[CurrentIndex];
 }
 
 void FVulkanSwapChain::CreateSyncObjects()
@@ -175,9 +174,11 @@ void FVulkanSwapChain::Destroy()
 
     vk_device.destroySwapchainKHR(swapChain);
     swapChain = nullptr;
+
+    CurrentIndex = INDEX_NONE;
 }
 
-uint32_t FVulkanSwapChain::AcquireNextImage()
+void FVulkanSwapChain::AcquireNextImage()
 {
     if (bSwapchainNeedsResize) {
         bSwapchainNeedsResize = false;
@@ -203,18 +204,21 @@ uint32_t FVulkanSwapChain::AcquireNextImage()
         throw std::runtime_error("Failed to acquire next image index");
     }
 
-    cachedNextImage = nextImageIndex;
-
-    return nextImageIndex;
+    CurrentIndex = nextImageIndex;
 }
 
 void FVulkanSwapChain::Present()
 {
+    assert(CurrentIndex != INDEX_NONE);
+
     const std::vector<vk::Semaphore> waitSemaphores = {
-        GetRenderFinishedSemaphore()};
+        GetRenderFinishedSemaphore(),
+    };
 
     const std::vector<vk::SwapchainKHR> swapChains = {swapChain};
-    const std::vector<uint32_t> swapChainIndices = {cachedNextImage};
+    const std::vector<uint32_t> swapChainIndices = {
+        static_cast<uint32_t>(CurrentIndex),
+    };
 
     const vk::PresentInfoKHR presentInfo = {
         .sType = vk::StructureType::ePresentInfoKHR,
