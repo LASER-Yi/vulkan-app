@@ -1,10 +1,10 @@
 #pragma once
 
 #include <memory>
-#include <vulkan/vulkan.h>
+#include <vulkan/vulkan.hpp>
 
 #include <vector>
-#include <vulkan/vulkan_core.h>
+#include <vulkan/vulkan.hpp>
 
 class FVulkanDevice;
 
@@ -15,20 +15,20 @@ class FVulkanSwapChain
     FVulkanSwapChain(const FVulkanSwapChain& other) = delete;
     ~FVulkanSwapChain();
 
-    VkFormat GetFormat() const { return ImageFormat; }
-    VkExtent2D GetExtent() const { return Extent; }
+    vk::Format GetFormat() const { return ImageFormat; }
+    vk::Extent2D GetExtent() const { return Extent; }
 
-    VkFramebuffer GetFrameBuffer() const;
+    vk::Framebuffer GetFrameBuffer() const;
 
     uint32_t AcquireNextImage();
     uint32_t GetCurrentImage() const { return cachedNextImage; };
 
-    VkSemaphore GetImageAvailableSemaphore() const
+    vk::Semaphore GetImageAvailableSemaphore() const
     {
         return imageAvailableSemaphore;
     }
 
-    VkSemaphore GetRenderFinishedSemaphore() const
+    vk::Semaphore GetRenderFinishedSemaphore() const
     {
         return renderFinishedSemaphore;
     }
@@ -42,21 +42,21 @@ class FVulkanSwapChain
   protected:
     FVulkanDevice* logicalDevice;
 
-    VkSwapchainKHR swapChain;
-    std::vector<VkImage> Images;
-    std::vector<VkImageView> ImageViews;
-    VkFormat ImageFormat;
-    VkExtent2D Extent;
+    vk::SwapchainKHR swapChain;
+    std::vector<vk::Image> Images;
+    std::vector<vk::ImageView> ImageViews;
+    vk::Format ImageFormat;
+    vk::Extent2D Extent;
 
-    std::vector<VkFramebuffer> frameBuffers;
+    std::vector<vk::Framebuffer> frameBuffers;
 
     uint32_t cachedNextImage;
 
     bool bSwapchainNeedsResize;
 
     // sync objects
-    VkSemaphore imageAvailableSemaphore;
-    VkSemaphore renderFinishedSemaphore;
+    vk::Semaphore imageAvailableSemaphore;
+    vk::Semaphore renderFinishedSemaphore;
 
   private:
     void CreateSwapChain();

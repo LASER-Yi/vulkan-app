@@ -4,7 +4,7 @@
 #include <cassert>
 #include <limits>
 #include <stdint.h>
-#include <vulkan/vulkan_core.h>
+#include <vulkan/vulkan.hpp>
 
 FSwapChainSupportDetails::FSwapChainSupportDetails(
     const VkPhysicalDevice device, const VkSurfaceKHR surface)

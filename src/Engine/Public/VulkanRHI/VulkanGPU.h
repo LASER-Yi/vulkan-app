@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include <vulkan/vulkan_core.h>
+#include <vulkan/vulkan.hpp>
 
 #include "VulkanRHI/QueueFamilyIndices.h"
 #include "VulkanRHI/SwapChainSupportDetails.h"
@@ -16,30 +16,30 @@ class FVulkanInstance;
 class FVulkanGpu
 {
   public:
-    FVulkanGpu(VkPhysicalDevice device, VkSurfaceKHR surface,
+    FVulkanGpu(vk::PhysicalDevice device, vk::SurfaceKHR* surface,
                const std::vector<const char*>& layers);
     ~FVulkanGpu();
 
     void InitLogicalDevice();
 
     FQueueFamilyIndices GetQueueFamilies() const;
-    const VkPhysicalDeviceProperties GetProperties() const;
-    const VkPhysicalDeviceFeatures GetFeatures() const;
+    const vk::PhysicalDeviceProperties GetProperties() const;
+    const vk::PhysicalDeviceFeatures GetFeatures() const;
 
-    std::vector<VkExtensionProperties> GetExtensions() const;
+    std::vector<vk::ExtensionProperties> GetExtensions() const;
 
     FSwapChainSupportDetails GetSwapChainSupportDetails() const;
 
     bool IsValid() const;
     uint32_t GetScore() const;
 
-    VkSurfaceKHR GetSurface() const;
+    vk::SurfaceKHR* GetSurface() const;
 
     FVulkanDevice* GetLogicalDevice() const;
 
   protected:
-    VkPhysicalDevice device;
-    VkSurfaceKHR surface;
+    vk::PhysicalDevice device;
+    vk::SurfaceKHR* surface;
 
     std::vector<const char*> layers;
 

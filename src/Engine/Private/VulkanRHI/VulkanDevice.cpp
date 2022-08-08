@@ -13,7 +13,7 @@
 #include <limits>
 #include <stdexcept>
 #include <vector>
-#include <vulkan/vulkan_core.h>
+#include <vulkan/vulkan.hpp>
 
 FVulkanDevice::FVulkanDevice(VkDevice device, FVulkanGpu* physicalDevice)
     : physicalDevice(physicalDevice), device(device)
@@ -145,8 +145,7 @@ void FVulkanDevice::InitSwapChain()
 {
     assert(device != VK_NULL_HANDLE);
 
-    swapChain = std::make_unique<FVulkanSwapChain>(
-        this);
+    swapChain = std::make_unique<FVulkanSwapChain>(this);
 }
 
 void FVulkanDevice::InitDeviceQueue()

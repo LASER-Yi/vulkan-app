@@ -3,7 +3,7 @@
 #include "Core/FileManager.h"
 #include <memory>
 #include <string>
-#include <vulkan/vulkan_core.h>
+#include <vulkan/vulkan.hpp>
 
 class FVulkanDevice;
 
@@ -11,15 +11,15 @@ class FVulkanShader
 {
   public:
     FVulkanShader(FVulkanDevice* device, const FileBlob& blob,
-                  VkShaderStageFlagBits stage, const std::string& entryPoint);
+                  vk::ShaderStageFlagBits stage, const std::string& entryPoint);
     ~FVulkanShader();
 
-    VkPipelineShaderStageCreateInfo CreatePipelineStage() const;
+    vk::PipelineShaderStageCreateInfo CreatePipelineStage() const;
 
   private:
     FVulkanDevice* device;
-    VkShaderModule ShaderModule;
+    vk::ShaderModule ShaderModule;
 
-    VkShaderStageFlagBits stage;
+    vk::ShaderStageFlagBits stage;
     std::string entryPoint;
 };

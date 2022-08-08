@@ -22,3 +22,6 @@ endif()
 
 target_include_directories(${PROJECT_NAME} INTERFACE ${GLFW_INCLUDE_DIR})
 target_link_libraries(${PROJECT_NAME} PRIVATE glfw)
+
+add_compile_definitions(VULKAN_HPP_NO_CONSTRUCTORS)
+add_compile_definitions(VULKAN_HPP_NO_STRUCT_CONSTRUCTORS)

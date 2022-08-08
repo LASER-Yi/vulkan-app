@@ -2,8 +2,8 @@
 
 #include <memory>
 #include <vector>
-#include <vulkan/vulkan.h>
-#include <vulkan/vulkan_core.h>
+#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan_handles.hpp>
 
 #include "GLFW/glfw3.h"
 #include "VulkanRHI/VulkanGPU.h"
@@ -25,8 +25,8 @@ class FVulkanInstance
     FVulkanGpu* GetPhysicalDevice() const { return device.get(); }
 
   protected:
-    VkInstance instance;
-    VkSurfaceKHR surface;
+    vk::Instance* instance;
+    vk::SurfaceKHR* surface;
     std::unique_ptr<FVulkanGpu> device;
 
     std::vector<const char*> enabledLayers;

@@ -3,27 +3,27 @@
 #include "GLFW/glfw3.h"
 #include <stdint.h>
 #include <vector>
-#include <vulkan/vulkan_core.h>
+#include <vulkan/vulkan.hpp>
 
 class GLFWwindow;
 
 struct FSwapChainSupportDetails {
-    VkSurfaceCapabilitiesKHR capabilities;
-    std::vector<VkSurfaceFormatKHR> formats;
-    std::vector<VkPresentModeKHR> presentModes;
+    vk::SurfaceCapabilitiesKHR capabilities;
+    std::vector<vk::SurfaceFormatKHR> formats;
+    std::vector<vk::PresentModeKHR> presentModes;
 
-    VkPhysicalDevice device;
-    VkSurfaceKHR surface;
+    vk::PhysicalDevice device;
+    vk::SurfaceKHR surface;
 
   public:
-    FSwapChainSupportDetails(const VkPhysicalDevice device,
-                             const VkSurfaceKHR surface);
+    FSwapChainSupportDetails(const vk::PhysicalDevice device,
+                             const vk::SurfaceKHR surface);
 
-    VkSurfaceKHR GetSurface() const { return surface; }
+    vk::SurfaceKHR GetSurface() const { return surface; }
 
-    VkSurfaceFormatKHR GetRequiredSurfaceFormat() const;
-    VkPresentModeKHR GetRequiredPresentMode() const;
-    VkExtent2D GetRequiredExtent(GLFWwindow* window) const;
+    vk::SurfaceFormatKHR GetRequiredSurfaceFormat() const;
+    vk::PresentModeKHR GetRequiredPresentMode() const;
+    vk::Extent2D GetRequiredExtent(GLFWwindow* window) const;
     uint32_t GetImageCount() const;
     bool IsValid() const;
 };

@@ -4,7 +4,8 @@
 #include <memory>
 #include <utility>
 #include <vector>
-#include <vulkan/vulkan_core.h>
+#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan_handles.hpp>
 
 #include "GLFW/glfw3.h"
 #include "VulkanRHI/VulkanCommon.h"
@@ -48,11 +49,11 @@ void FVulkanRHI::Render()
 
 FVulkanInstance* FVulkanRHI::GetInstance() const { return Instance.get(); }
 
-std::vector<VkExtensionProperties> FVulkanRHI::GetAvailableExtensions()
+std::vector<vk::ExtensionProperties> FVulkanRHI::GetAvailableExtensions()
 {
     uint32_t extensionCount = 0;
     vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
-    std::vector<VkExtensionProperties> extensions(extensionCount);
+    std::vector<vk::ExtensionProperties> extensions(extensionCount);
     vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount,
                                            extensions.data());
 

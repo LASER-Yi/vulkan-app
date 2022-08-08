@@ -2,7 +2,8 @@
 
 #include <memory>
 #include <vector>
-#include <vulkan/vulkan.h>
+#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan_handles.hpp>
 
 #include "GLFW/glfw3.h"
 #include "VulkanInstance.h"
@@ -21,15 +22,15 @@ class FVulkanRHI
 
     FVulkanInstance* GetInstance() const;
 
-    static std::vector<VkExtensionProperties> GetAvailableExtensions();
-    static std::vector<VkLayerProperties> GetAvailableLayers();
+    static std::vector<vk::ExtensionProperties> GetAvailableExtensions();
+    static std::vector<vk::LayerProperties> GetAvailableLayers();
 
   private:
     std::unique_ptr<FVulkanInstance> Instance;
     GLFWwindow* window;
 
     // TODO: refactor this
-    VkCommandBuffer commandBuffer;
+    vk::CommandBuffer commandBuffer;
 
   private:
     void CreateWindow();

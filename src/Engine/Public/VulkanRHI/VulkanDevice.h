@@ -2,11 +2,13 @@
 
 #include "VulkanRHI/QueueFamilyIndices.h"
 #include "VulkanRHI/SwapChainSupportDetails.h"
-#include "vulkan/vulkan_core.h"
+#include <vulkan/vulkan.hpp>
 
 #include <memory>
 #include <string>
 #include <vector>
+#include <vulkan/vulkan_handles.hpp>
+#include <vulkan/vulkan_structs.hpp>
 
 class FVulkanGpu;
 class FVulkanShader;
@@ -15,54 +17,54 @@ class FVulkanSwapChain;
 class FVulkanDevice
 {
   public:
-    FVulkanDevice(VkDevice device, FVulkanGpu* physicalDevice);
+    FVulkanDevice(vk::Device device, FVulkanGpu* physicalDevice);
     ~FVulkanDevice();
 
     std::shared_ptr<FVulkanShader> CreateShader(const std::string& filename,
-                                                VkShaderStageFlagBits stage);
+                                                vk::ShaderStageFlagBits stage);
 
-    VkQueue GetGraphicsQueue() const { return graphicsQueue; }
-    VkQueue GetPresentQueue() const { return presentQueue; }
+    vk::Queue GetGraphicsQueue() const { return graphicsQueue; }
+    vk::Queue GetPresentQueue() const { return presentQueue; }
 
-    VkDevice GetDevice() const { return device; }
+    vk::Device GetDevice() const { return device; }
 
     FVulkanGpu* GetPhysicalDevice() const { return physicalDevice; }
 
     FVulkanSwapChain* GetSwapChain() const { return swapChain.get(); }
 
-    VkRenderPass GetRenderPass() const { return renderPass; }
+    vk::RenderPass GetRenderPass() const { return renderPass; }
 
     void BeginNextFrame();
 
-    VkCommandBuffer CreateCommandBuffer();
+    vk::CommandBuffer CreateCommandBuffer();
 
-    void Render(VkCommandBuffer commandBuffer);
-    void Submit(VkCommandBuffer commandBuffer);
+    void Render(vk::CommandBuffer commandBuffer);
+    void Submit(vk::CommandBuffer commandBuffer);
 
   protected:
     FVulkanGpu* physicalDevice;
 
-    VkDevice device;
+    vk::Device device;
 
-    VkQueue graphicsQueue;
-    VkQueue presentQueue;
+    vk::Queue graphicsQueue;
+    vk::Queue presentQueue;
 
     std::unique_ptr<FVulkanSwapChain> swapChain;
 
     std::vector<std::shared_ptr<FVulkanShader>> shaders;
 
     // TODO: Move to separate class
-    VkViewport viewport;
-    VkRect2D scissor;
+    vk::Viewport viewport;
+    vk::Rect2D scissor;
 
-    VkPipelineLayout pipelineLayout;
-    VkPipeline graphicsPipeline;
+    vk::PipelineLayout pipelineLayout;
+    vk::Pipeline graphicsPipeline;
 
-    VkRenderPass renderPass;
+    vk::RenderPass renderPass;
 
-    VkCommandPool commandPool;
+    vk::CommandPool commandPool;
 
-    VkFence inRenderFence;
+    vk::Fence inRenderFence;
 
   private:
     void InitSwapChain();

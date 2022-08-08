@@ -1,10 +1,14 @@
 #include "VulkanRHI/VulkanInstance.h"
 
+#include <cstddef>
 #include <iostream>
 #include <memory>
+#include <string>
 #include <vector>
 #include <vulkan/vulkan.hpp>
-#include <vulkan/vulkan_core.h>
+#include <vulkan/vulkan_enums.hpp>
+#include <vulkan/vulkan_handles.hpp>
+#include <vulkan/vulkan_structs.hpp>
 
 #include "Definition.h"
 #include "GLFW/glfw3.h"
@@ -15,8 +19,8 @@
 std::vector<const char*> FVulkanInstance::validationLayers = {
     "VK_LAYER_KHRONOS_validation"};
 
-FVulkanInstance::FVulkanInstance(GLFWwindow* window):
-    instance(VK_NULL_HANDLE), surface(VK_NULL_HANDLE)
+FVulkanInstance::FVulkanInstance(GLFWwindow* window)
+    : instance(VK_NULL_HANDLE), surface(VK_NULL_HANDLE)
 {
     assert(window != nullptr);
 
@@ -29,7 +33,8 @@ FVulkanInstance::~FVulkanInstance()
 {
     device = nullptr;
 
-    vkDestroyInstance(instance, nullptr);
+    instance->destroy();
+    instance = nullptr;
 }
 
 std::vector<std::unique_ptr<FVulkanGpu>> FVulkanInstance::GetGPUs() const
@@ -37,19 +42,16 @@ std::vector<std::unique_ptr<FVulkanGpu>> FVulkanInstance::GetGPUs() const
     assert(instance != VK_NULL_HANDLE);
     assert(surface != VK_NULL_HANDLE);
 
-    uint32_t deviceCount = 0;
-    vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
+    std::vector<vk::PhysicalDevice> devices =
+        instance->enumeratePhysicalDevices();
 
-    if (deviceCount == 0) {
+    if (devices.size() == 0) {
         throw std::runtime_error("Failed to find GPUs with Vulkan support!");
     }
 
-    std::vector<VkPhysicalDevice> devices(deviceCount);
-    vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
-
     std::vector<std::unique_ptr<FVulkanGpu>> gpus;
     gpus.reserve(devices.size());
-    for (const auto& device : devices) {
+    for (auto& device : devices) {
         gpus.emplace_back(
             std::make_unique<FVulkanGpu>(device, surface, enabledLayers));
     }
@@ -59,12 +61,12 @@ std::vector<std::unique_ptr<FVulkanGpu>> FVulkanInstance::GetGPUs() const
 
 bool FVulkanInstance::SupportValidationLayer() const
 {
-    const std::vector<VkLayerProperties> availableLayers =
+    const std::vector<vk::LayerProperties> availableLayers =
         FVulkanRHI::GetAvailableLayers();
 
 #if BUILD_DEBUG
     std::cout << "Available layers:" << std::endl;
-    for (const VkLayerProperties& layerProperties : availableLayers) {
+    for (const vk::LayerProperties& layerProperties : availableLayers) {
 
         std::cout << '\t' << layerProperties.layerName << std::endl;
     }
@@ -72,7 +74,7 @@ bool FVulkanInstance::SupportValidationLayer() const
 
     for (const char* layerName : validationLayers) {
         bool layerFound = false;
-        for (const VkLayerProperties& layerProperties : availableLayers) {
+        for (const vk::LayerProperties& layerProperties : availableLayers) {
             if (strcmp(layerName, layerProperties.layerName) == 0) {
                 layerFound = true;
                 break;
@@ -87,7 +89,7 @@ bool FVulkanInstance::SupportValidationLayer() const
 
 void FVulkanInstance::SelectGPU()
 {
-    assert(instance != VK_NULL_HANDLE);
+    assert(instance != nullptr);
     auto gpus = GetGPUs();
 
     // Simplest solution
@@ -112,16 +114,18 @@ void FVulkanInstance::CreateInstance()
             "Validation layers requested, but not available!");
     }
 
-    VkApplicationInfo appInfo = {};
-    ZeroVulkanStruct(appInfo, VK_STRUCTURE_TYPE_APPLICATION_INFO);
-    appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    appInfo.pApplicationName = "Vulkan Game Engine";
-    appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.pEngineName = "Game Engine";
-    appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_2;
+    static const std::string appName = "Vulkan App";
+    static const std::string engineName = "Vulkan Engine";
 
-    std::vector<VkExtensionProperties> extensions =
+    vk::ApplicationInfo appInfo = {.sType = vk::StructureType::eApplicationInfo,
+                                   .pApplicationName = appName.c_str(),
+                                   .applicationVersion =
+                                       VK_MAKE_VERSION(1, 0, 0),
+                                   .pEngineName = engineName.c_str(),
+                                   .engineVersion = VK_MAKE_VERSION(1, 0, 0),
+                                   .apiVersion = VK_API_VERSION_1_2};
+
+    std::vector<vk::ExtensionProperties> extensions =
         FVulkanRHI::GetAvailableExtensions();
 
 #if BUILD_DEBUG
@@ -131,10 +135,9 @@ void FVulkanInstance::CreateInstance()
     }
 #endif
 
-    VkInstanceCreateInfo createInfo = {};
-    ZeroVulkanStruct(createInfo, VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO);
-    createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-    createInfo.pApplicationInfo = &appInfo;
+    vk::InstanceCreateInfo createInfo = {
+        .sType = vk::StructureType::eInstanceCreateInfo,
+        .pApplicationInfo = &appInfo};
 
     enabledExtensions.clear();
     {
@@ -168,20 +171,14 @@ void FVulkanInstance::CreateInstance()
     createInfo.enabledLayerCount = enabledLayers.size();
     createInfo.ppEnabledLayerNames = enabledLayers.data();
 
-    const VkResult CreateResult =
-        vkCreateInstance(&createInfo, nullptr, &instance);
-
-    if (CreateResult != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create Vulkan instance");
-    }
+    VERIFY_VULKAN_RESULT(vk::createInstance(&createInfo, nullptr, instance));
 }
 
 void FVulkanInstance::CreateSurface(GLFWwindow* window)
 {
-    const VkResult CreateResult =
-        glfwCreateWindowSurface(instance, window, nullptr, &surface);
+    VkSurfaceKHR c_surface;
+    VERIFY_VULKAN_RESULT_C(
+        glfwCreateWindowSurface(*instance, window, nullptr, &c_surface));
 
-    if (CreateResult != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create window surface!");
-    }
+    surface = new vk::SurfaceKHR(c_surface);
 }

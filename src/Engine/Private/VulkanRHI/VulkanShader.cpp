@@ -5,7 +5,7 @@
 #include "VulkanRHI/VulkanDevice.h"
 #include <memory>
 #include <stdexcept>
-#include <vulkan/vulkan_core.h>
+#include <vulkan/vulkan.hpp>
 
 FVulkanShader::FVulkanShader(FVulkanDevice* device, const FileBlob& blob,
                              VkShaderStageFlagBits stage,

@@ -12,7 +12,7 @@
 #include <string>
 #include <utility>
 #include <vector>
-#include <vulkan/vulkan_core.h>
+#include <vulkan/vulkan.hpp>
 
 #include "VulkanRHI/QueueFamilyIndices.h"
 #include "VulkanRHI/SwapChainSupportDetails.h"
