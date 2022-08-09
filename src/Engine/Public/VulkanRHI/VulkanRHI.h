@@ -7,8 +7,6 @@
 #include "GLFW/glfw3.h"
 #include "VulkanInstance.h"
 
-class GLFWwindow;
-
 class FVulkanRHI
 {
   public:

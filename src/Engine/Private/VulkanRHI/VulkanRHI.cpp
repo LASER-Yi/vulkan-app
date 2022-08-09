@@ -50,18 +50,12 @@ FVulkanInstance* FVulkanRHI::GetInstance() const { return Instance.get(); }
 
 std::vector<vk::ExtensionProperties> FVulkanRHI::GetAvailableExtensions()
 {
-    std::vector<vk::ExtensionProperties> extensions =
-        vk::enumerateInstanceExtensionProperties();
-
-    return std::move(extensions);
+    return vk::enumerateInstanceExtensionProperties();
 }
 
 std::vector<vk::LayerProperties> FVulkanRHI::GetAvailableLayers()
 {
-    std::vector<vk::LayerProperties> layers =
-        vk::enumerateInstanceLayerProperties();
-
-    return std::move(layers);
+    return vk::enumerateInstanceLayerProperties();
 }
 
 void FVulkanRHI::CreateWindow()
@@ -77,6 +71,10 @@ void FVulkanRHI::CreateWindow()
 
 void FVulkanRHI::OnFramebufferResize(GLFWwindow* window, int width, int height)
 {
+    // silent unused parameter warning
+    (void)width;
+    (void)height;
+
     auto rhi = reinterpret_cast<FVulkanRHI*>(glfwGetWindowUserPointer(window));
 
     rhi->GetInstance()

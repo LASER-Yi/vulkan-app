@@ -139,7 +139,8 @@ void FVulkanSwapChain::CreateFrameBuffers()
 
 vk::Framebuffer FVulkanSwapChain::GetFrameBuffer() const
 {
-    assert(CurrentIndex < frameBuffers.size() && CurrentIndex != INDEX_NONE);
+    assert(CurrentIndex < static_cast<int32_t>(frameBuffers.size()) &&
+           CurrentIndex != INDEX_NONE);
     return frameBuffers[CurrentIndex];
 }
 

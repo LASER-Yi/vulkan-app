@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <iostream>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 #include <vulkan/vulkan.hpp>
@@ -49,7 +50,7 @@ std::vector<std::unique_ptr<FVulkanGpu>> FVulkanInstance::GetGPUs()
             std::make_unique<FVulkanGpu>(device, this, enabledLayers));
     }
 
-    return std::move(gpus);
+    return gpus;
 }
 
 bool FVulkanInstance::SupportValidationLayer() const
@@ -171,6 +172,10 @@ void FVulkanInstance::CreateSurface(GLFWwindow* window)
     VkSurfaceKHR c_surface;
     const VkResult Result =
         glfwCreateWindowSurface(instance, window, nullptr, &c_surface);
+
+    if (Result != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create window surface");
+    }
 
     surface = c_surface;
 }

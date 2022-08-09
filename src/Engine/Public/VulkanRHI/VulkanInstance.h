@@ -8,7 +8,6 @@
 #include "VulkanRHI/VulkanGPU.h"
 
 class FVulkanRHI;
-class GLFWwindow;
 
 class FVulkanInstance
 {

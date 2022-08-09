@@ -5,7 +5,7 @@
 #include <vector>
 #include <vulkan/vulkan.hpp>
 
-class GLFWwindow;
+struct GLFWwindow;
 
 struct FSwapChainSupportDetails {
     vk::SurfaceCapabilitiesKHR capabilities;

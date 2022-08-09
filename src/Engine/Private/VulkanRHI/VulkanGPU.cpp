@@ -102,7 +102,7 @@ bool FVulkanGpu::IsValid() const
 uint32_t FVulkanGpu::GetScore() const
 {
     const auto properties = GetProperties();
-    const auto features = GetFeatures();
+    // const auto features = GetFeatures();
 
     uint32_t score = 0;
 
