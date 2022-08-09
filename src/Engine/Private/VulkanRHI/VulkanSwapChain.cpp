@@ -45,8 +45,6 @@ void FVulkanSwapChain::CreateSwapChain()
         .sType = vk::StructureType::eSwapchainCreateInfoKHR,
         .surface = details.GetSurface(),
         .minImageCount = details.GetImageCount(),
-        .presentMode = details.GetRequiredPresentMode(),
-        .clipped = VK_TRUE,
         .imageFormat = surfaceFormat.format,
         .imageColorSpace = surfaceFormat.colorSpace,
         .imageExtent = details.GetRequiredExtent(nullptr),
@@ -54,6 +52,8 @@ void FVulkanSwapChain::CreateSwapChain()
         .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
         .preTransform = details.capabilities.currentTransform,
         .compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque,
+        .presentMode = details.GetRequiredPresentMode(),
+        .clipped = VK_TRUE,
         .oldSwapchain = nullptr,
     };
 

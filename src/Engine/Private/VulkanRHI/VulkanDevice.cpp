@@ -10,9 +10,7 @@
 
 #include <array>
 #include <cassert>
-#include <cstddef>
 #include <limits>
-#include <stdexcept>
 #include <vector>
 #include <vulkan/vulkan.hpp>
 
@@ -72,11 +70,12 @@ void FVulkanDevice::Render(vk::CommandBuffer* commandBuffer)
 
     VERIFY_VULKAN_RESULT(commandBuffer->begin(&beginInfo))
 
-    const std::array<float, 4> defaultClearColor = {0.0f, 0.0f, 0.0f, 1.0f};
-    vk::ClearValue clearValue = {.color = defaultClearColor};
+    const std::array defaultClearColor = {0.0f, 0.0f, 0.0f, 1.0f};
+    const vk::ClearColorValue colorValue = defaultClearColor;
 
     const std::vector<vk::ClearValue> clearColors = {
-        {.color = {.float32 = {}}}};
+        colorValue,
+    };
 
     const vk::RenderPassBeginInfo renderPassInfo = {
         .sType = vk::StructureType::eRenderPassBeginInfo,
@@ -120,22 +119,22 @@ void FVulkanDevice::Submit(vk::CommandBuffer* commandBuffer)
         GetSwapChain()->GetRenderFinishedSemaphore(),
     };
 
-    const vk::PipelineStageFlags pipelineFlags = {
+    constexpr vk::PipelineStageFlags pipelineFlags = {
         vk::PipelineStageFlagBits::eColorAttachmentOutput,
     };
 
     const vk::SubmitInfo submitInfo = {
         .sType = vk::StructureType::eSubmitInfo,
-        .commandBufferCount = 1,
-        .pCommandBuffers = commandBuffer,
-        .pWaitDstStageMask = &pipelineFlags,
         .waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size()),
         .pWaitSemaphores = waitSemaphores.data(),
+        .pWaitDstStageMask = &pipelineFlags,
+        .commandBufferCount = 1,
+        .pCommandBuffers = commandBuffer,
         .signalSemaphoreCount = static_cast<uint32_t>(signalSemaphores.size()),
         .pSignalSemaphores = signalSemaphores.data(),
     };
 
-    vk::Queue* graphicsQueue = GetGraphicsQueue();
+    const vk::Queue* graphicsQueue = GetGraphicsQueue();
 
     graphicsQueue->submit({submitInfo}, inRenderFence);
 }
@@ -217,19 +216,20 @@ void FVulkanDevice::InitPipeline()
         .depthClampEnable = VK_FALSE,
         .rasterizerDiscardEnable = VK_FALSE,
         .polygonMode = vk::PolygonMode::eFill,
-        .lineWidth = 1.0f,
         .cullMode = vk::CullModeFlagBits::eBack,
         .frontFace = vk::FrontFace::eClockwise,
         .depthBiasEnable = VK_FALSE,
         .depthBiasConstantFactor = 0.0f,
         .depthBiasClamp = 0.0f,
-        .depthBiasSlopeFactor = 0.0f};
+        .depthBiasSlopeFactor = 0.0f,
+        .lineWidth = 1.0f,
+    };
 
     // Multisampling (required GPU feature)
     const vk::PipelineMultisampleStateCreateInfo multisamplingInfo = {
         .sType = vk::StructureType::ePipelineMultisampleStateCreateInfo,
-        .sampleShadingEnable = VK_FALSE,
         .rasterizationSamples = vk::SampleCountFlagBits::e1,
+        .sampleShadingEnable = VK_FALSE,
         .minSampleShading = 1.0f,
         .pSampleMask = nullptr,
         .alphaToCoverageEnable = VK_FALSE,
@@ -241,9 +241,6 @@ void FVulkanDevice::InitPipeline()
 
     // Color blending
     const vk::PipelineColorBlendAttachmentState colorBlendAttachment = {
-        .colorWriteMask =
-            vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-            vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
         .blendEnable = VK_FALSE,
         .srcColorBlendFactor = vk::BlendFactor::eOne,
         .dstColorBlendFactor = vk::BlendFactor::eZero,
@@ -251,6 +248,9 @@ void FVulkanDevice::InitPipeline()
         .srcAlphaBlendFactor = vk::BlendFactor::eOne,
         .dstAlphaBlendFactor = vk::BlendFactor::eZero,
         .alphaBlendOp = vk::BlendOp::eAdd,
+        .colorWriteMask =
+            vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+            vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
     };
 
     const std::array<float, 4> defaultBlendConstants = {0.0f, 0.0f, 0.0f, 0.0f};
@@ -332,10 +332,10 @@ void FVulkanDevice::InitRenderPass()
     const vk::SubpassDependency dependency = {
         .srcSubpass = VK_SUBPASS_EXTERNAL,
         .dstSubpass = 0,
-        .srcAccessMask = vk::AccessFlagBits::eNone,
         .srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
-        .dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite,
         .dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+        .srcAccessMask = vk::AccessFlagBits::eNoneKHR,
+        .dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite,
     };
 
     // Render pass
@@ -359,8 +359,9 @@ void FVulkanDevice::InitCommandPool()
 
     const vk::CommandPoolCreateInfo commandPoolInfo = {
         .sType = vk::StructureType::eCommandPoolCreateInfo,
+        .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
         .queueFamilyIndex = indices.graphicsFamily.value(),
-        .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer};
+    };
 
     VERIFY_VULKAN_RESULT(
         device.createCommandPool(&commandPoolInfo, nullptr, &commandPool));
