@@ -4,7 +4,7 @@ A self-learning project of Vulkan
 
 ## Setup
 
-1. Download and install [VulkanSDK](https://vulkan.lunarg.com/sdk/home) in your computer
+1. Download and install [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) to your computer
 
 2. Clone this project
 

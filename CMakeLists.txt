@@ -16,7 +16,7 @@ list(APPEND CMAKE_MODULE_PATH
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-# Third party libraries
+# Third-party libraries
 # GLFW3
 include(GLFW)
 

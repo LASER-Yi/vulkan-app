@@ -34,8 +34,8 @@ static inline void _verifyVulkanResult(const T& Result, const char* VkFunction,
                     static_cast<int32_t>(Result), Filename, Line));
 #else
     std::string errorMsg = "%s failed, VkResult=%d\n at %s:%u \n";
-    sprintf(errorMsg.data(), VkFunction, static_cast<int32_t>(Result), Filename,
-            Line);
+    snprintf(errorMsg.data(), errorMsg.size(), VkFunction,
+             static_cast<int32_t>(Result), Filename, Line);
 
     throw std::runtime_error(errorMsg);
 #endif
